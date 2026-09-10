@@ -1,4 +1,4 @@
-# پورتال کارکنان آذرشین
+# پورتال کارکنان 
 
 A Persian RTL employee portal and separate administration interface using Next.js App Router, strict TypeScript, React, Tailwind CSS, Lucide icons, and locally hosted Vazirmatn.
 
