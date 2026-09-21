@@ -1,5 +1,6 @@
 import type { Employee, Notification } from "@/types";
 /** Explicitly demo identities, not authoritative directory records. */
+export const demoEmployeeCredentials = { username: "employee", password: "employee123" } as const;
 export const demoEmployee: Employee = { id: "employee-1001", personnelCode: "1001", name: "علی محمدی", department: "IT", role: "EMPLOYEE" };
 export const demoAdmin: Employee = { id: "admin-1", personnelCode: "admin", name: "مدیر سامانه", department: "IT", role: "ADMIN" };
 export const notifications: Notification[] = [

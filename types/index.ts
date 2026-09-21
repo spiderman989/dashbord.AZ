@@ -1,5 +1,9 @@
 export type Role = "EMPLOYEE" | "ADMIN" | "SUPER_ADMIN" | "HR" | "CONTENT_MANAGER";
-export interface Employee { id: string; personnelCode: string; name: string; department: string; role: Role; }
+export interface Employee { id: string; personnelCode: string; name: string; department: string; role: Role; username?: string; }
+/** Browser-local mock employee account credentials. */
+export interface EmployeeAccount { id: string; firstName: string; lastName: string; position: string; username: string; password: string; }
+export type FeedbackType = "suggestion" | "criticism";
+export interface Feedback { id: string; employeeId: string; type: FeedbackType; subject: string; message: string; createdAt: string; status: "submitted"; }
 export type ContentStatus = "draft" | "published" | "archived";
 export type CourseStatus = "draft" | "active" | "finished" | "inactive";
 export type ProcessStatus = "new" | "in_progress" | "completed" | "action_required";

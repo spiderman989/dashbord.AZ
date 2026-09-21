@@ -1,21 +1,41 @@
-import { demoAdmin, demoEmployee } from "@/data/employees";
-import { toEnglishDigits } from "@/lib/utils";
-import type { Employee, Role } from "@/types";
+import { demoAdmin, demoEmployee, demoEmployeeCredentials } from "@/data/employees";
+import { employeeService } from "./employeeService";
+import type { Employee, EmployeeAccount, Role } from "@/types";
 
 const EMPLOYEE_KEY = "azarshin.demo.employee";
 const ADMIN_KEY = "azarshin.demo.admin";
 export const adminRoles: Role[] = ["ADMIN", "SUPER_ADMIN", "CONTENT_MANAGER", "HR"];
-export const demoCredentials = { employee: { personnelCode: "1001", nationalId: "0012345678" }, admin: { username: "admin", password: "admin123" } } as const;
+export const demoCredentials = { employee: demoEmployeeCredentials, admin: { username: "admin", password: "admin123" } } as const;
 function readSession(key: string, identity: Employee): Employee | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(key) === identity.id ? { ...identity } : null;
 }
-export async function getCurrentEmployee(): Promise<Employee | null> { return readSession(EMPLOYEE_KEY, demoEmployee); }
+function accountIdentity(account: EmployeeAccount): Employee {
+  return { id: account.id, personnelCode: "", username: account.username, name: `${account.firstName} ${account.lastName}`, department: account.position, role: "EMPLOYEE" };
+}
+export async function getCurrentEmployee(): Promise<Employee | null> {
+  if (typeof window === "undefined") return null;
+  const id = localStorage.getItem(EMPLOYEE_KEY);
+  if (!id) return null;
+  if (id === demoEmployee.id) return { ...demoEmployee, username: demoCredentials.employee.username };
+  const account = await employeeService.get(id);
+  return account ? accountIdentity(account) : null;
+}
 export async function getCurrentAdmin(): Promise<Employee | null> { return readSession(ADMIN_KEY, demoAdmin); }
-export async function loginEmployee(personnelCode: string, nationalId: string): Promise<Employee> {
+export async function loginEmployee(username: string, password: string): Promise<Employee> {
+  const normalizedUsername = username.trim().toLowerCase();
+  if (!normalizedUsername) throw new Error("نام کاربری را وارد کنید.");
+  if (!/^[a-z0-9][a-z0-9._-]{2,39}$/.test(normalizedUsername)) throw new Error("نام کاربری باید ۳ تا ۴۰ نویسه باشد و با حرف انگلیسی یا عدد شروع شود؛ فقط حروف انگلیسی، عدد، نقطه، خط تیره و زیرخط مجاز است.");
+  if (!password.trim()) throw new Error("رمز عبور را وارد کنید.");
+  if (password.trim().length < 6 || password.length > 80) throw new Error("رمز عبور باید بین ۶ تا ۸۰ نویسه باشد.");
   await new Promise((resolve) => setTimeout(resolve, 450));
-  if (toEnglishDigits(personnelCode.trim()) !== demoCredentials.employee.personnelCode || toEnglishDigits(nationalId.trim()) !== demoCredentials.employee.nationalId) throw new Error("کد پرسنلی یا کد ملی نادرست است.");
-  localStorage.setItem(EMPLOYEE_KEY, demoEmployee.id); return { ...demoEmployee };
+  const account = (await employeeService.list()).find((item) => item.username.toLowerCase() === normalizedUsername);
+  const identity = account
+    ? account.password === password ? accountIdentity(account) : null
+    : normalizedUsername === demoCredentials.employee.username && password === demoCredentials.employee.password
+      ? { ...demoEmployee, username: demoCredentials.employee.username } : null;
+  if (!identity) throw new Error("نام کاربری یا رمز عبور نادرست است.");
+  localStorage.setItem(EMPLOYEE_KEY, identity.id); return identity;
 }
 export async function loginAdmin(username: string, password: string): Promise<Employee> {
   await new Promise((resolve) => setTimeout(resolve, 450));

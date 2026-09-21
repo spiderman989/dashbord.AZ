@@ -1,80 +1,40 @@
 # پورتال کارکنان 
 
-A Persian RTL employee portal and separate administration interface using Next.js App Router, strict TypeScript, React, Tailwind CSS, Lucide icons, and locally hosted Vazirmatn.
+A Persian RTL employee portal and administration panel built with Next.js App Router, React, strict TypeScript, Tailwind CSS, Lucide, and locally hosted Vazirmatn.
 
-**Validation status (2026-09-09):** npm installation, lint, full TypeScript checking, the production build, all four domain tests and source checks pass. Chrome browser verification passes 14 workflows, 86 route/viewport checks and 11 automated accessibility audits, with no overflow, broken images, or console/hydration errors. Desktop and mobile screenshots were reviewed. See [docs/VALIDATION.md](docs/VALIDATION.md) for evidence, focused fixes and verification limits.
+**Start future AI coding tasks with [docs/AI_CONTEXT.md](docs/AI_CONTEXT.md).** The [documentation index](docs/INDEX.md) links architecture, every route, feature/file maps, component contracts, local data, authentication, design conventions, and the change workflow.
 
 ## Run locally
 
+Use Node 24 to match the audited environment, then:
+
 ```sh
-npm install
+npm ci
 npm run dev
 ```
 
-Open http://localhost:3000. On Windows with PowerShell script execution disabled, use `npm.cmd` in place of `npm`. Installation runs `scripts/setup-assets.mjs` to copy the licensed Vazirmatn font into `public/fonts/` automatically.
+Open `http://localhost:3000`. Use `npm.cmd` instead of `npm` if PowerShell blocks npm's script wrapper. Installation copies the licensed local font through the existing postinstall script.
 
-| Account | Login | Demo credentials |
-| --- | --- | --- |
-| Employee | `/login` | Personnel code `1001`, national ID `0012345678` |
-| Admin | `/admin/login` | Username `admin`, password `admin123` |
+The two public login pages are `/login` and `/admin/login`. Both use username/password. Built-in sample credentials and admin-created local employee login behavior are documented in [AUTH_AND_PERMISSIONS.md](docs/AUTH_AND_PERMISSIONS.md).
 
-These credentials are deliberately public mock values. Login forms provide a button to fill the demo credentials. Employee and admin sessions are independent, so both areas can be reviewed in one browser.
+## Current scope
 
-## Validation
+Employees can use a dashboard, process inbox and request forms, phone directory, published news, training requests, local tickets, activity history, and **صندوق انتقادات و پیشنهادات** with only پیشنهاد / انتقاد. Administrators manage content, quick links, directory entries, and employee accounts through **مدیریت کارکنان**. CRM is a preparation page.
+
+Business data and credentials are browser-local demonstrations. There are **no application APIs, database connections, backend business services, or real authentication**. Next.js provides rendering/serving; client guards are not security boundaries. See [PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) and [API_AND_DATA.md](docs/API_AND_DATA.md) for implemented features and limitations.
+
+The authoritative 10 departments and 25 extension records are separate from employee accounts. Their original spelling, grouping, ordering, and duplicates are regression tested. Branding and supplied references are mapped in [ASSETS.md](docs/ASSETS.md).
+
+## Development and validation
 
 ```sh
 npm run lint
 npm run typecheck
 npm test
 npm run build
-npm start
-# In another terminal, with Chrome installed:
-npm run test:e2e
+node docs/check-docs.mjs
 ```
 
-The browser suite tests employee/admin login, CRUD, publication visibility, date validation, image uploads, toggles, ordering, process submission, course enrollment, tickets, exact directory preservation, search normalization, pagination, mobile drawers, keyboard dismissal, logout, and persistence. It checks the routes at desktop and mobile widths, plus representative layouts at 1920, 1280, 1024, 768, and 360 pixels. It records screenshots and an accessibility/layout report under `test-results/`. Set `PORTAL_TEST_URL` to test a different local port.
+Browser QA requires a running production server and installed Chrome; run `npm run test:e2e` in another terminal. [DEVELOPMENT_GUIDE.md](docs/DEVELOPMENT_GUIDE.md) documents supported commands, dependencies, optional `PORTAL_TEST_URL`, outputs, and troubleshooting. [VALIDATION.md](docs/VALIDATION.md) separates dated evidence from checks performed during documentation work.
 
-## Routes
-
-Employee: `/login`, `/`, `/processes`, `/processes/new`, `/processes/[id]`, `/phone-directory`, `/news`, `/news/[id]`, `/courses`, `/tickets`, `/crm`, `/activities`, `/announcements`.
-
-Admin: `/admin/login`, `/admin`, `/admin/news`, `/admin/news/new`, `/admin/news/[id]`, `/admin/courses`, `/admin/courses/new`, `/admin/courses/[id]`, `/admin/gallery`, `/admin/announcements`, `/admin/processes`, `/admin/activities`, `/admin/phone-directory`.
-
-CRM provides an explicit preparation state with working support navigation. Process viewing has an informational mock preview until an API-provided case link is available.
-
-## Architecture
-
-```text
-app/          App Router layouts, pages, loading and error boundaries
-components/   Reusable UI primitives, employee features, admin management
-data/         Demo content and authoritative phone-directory seed
-services/     Async repository contracts, auth and domain services
-hooks/        Lifecycle-safe subscriptions and loading/error handling
-types/        Central domain interfaces and future role definitions
-lib/          Jalali formatting, Persian normalization, labels and navigation
-public/       Supplied organizational assets and local font
-tests/        Exact directory, Persian search, calendar and link-safety tests
-scripts/      Browser workflow, responsive and accessibility verification
-```
-
-UI components read services. Services use one local mock repository. Mutations persist in browser localStorage, notify mounted subscribers, and synchronize across tabs through storage events. Server-rendered pages provide initial seeds; client subscribers reconcile browser edits. Stored edits survive navigation/reloads and appear in the employee portal. No component imports mock content arrays directly.
-
-Phone records use stable independent IDs. Names that look duplicated are never merged. Each department and extension supports mock CRUD; extensions can be enabled or disabled. Original seed records remain unchanged on disk. Explicit administrator edits affect browser storage only. Admin forms retain manager titles in parentheses.
-
-Date display uses `Intl.DateTimeFormat` with the actual Persian calendar and `Asia/Tehran`. The calendar computes Jalali month lengths including leap years, has month navigation and a return-to-today action. Date form inputs use browser-native Gregorian input with a Persian explanation; published dates are always shown in Jalali.
-
-## Replace mocks with the company API
-
-Replace `services/mockRepository.ts` or individual domain service methods with typed calls to the company API. Retain the `Repository<T>` interface and use `getEmployeeProcesses(employeeId)` for an employee inbox. Production authentication must come from a backend-verified session using secure HttpOnly cookies and server-enforced permissions. Mock browser route guards are UI behavior, not production authorization.
-
-The future flow is **Browser → Next.js → Company Backend/API → MySQL / ProcessMaker 3.8.3**. This project has no MySQL client, database connection, ProcessMaker calls, environment secrets, access tokens, or real backend. Only an approved task URL supplied by the backend is passed to `ProcessItem.backendTaskUrl`; the UI rejects executable URL schemes. The backend must validate task ownership and any destination before returning a URL.
-
-Images uploaded in the demo are decoded and validated in the browser (PNG/JPEG/WebP, at most 1 MB) and stored as data URLs. Storage quota errors are surfaced to the user. Replace this with a backend upload service for production storage. Demo persistence is device/browser-local, not multi-user storage.
-
-Roles are prepared as `EMPLOYEE`, `ADMIN`, `SUPER_ADMIN`, `HR`, and `CONTENT_MANAGER`; finer-grained authorization belongs in the company backend.
-
-## Branding
-
-See [docs/ASSETS.md](docs/ASSETS.md) for the inspected assets, their mapping, and the brand palette. The supplied brand sheet is the branding authority, and the supplied dashboard screenshot is the layout authority.
-
-Framework references: [Next.js installation](https://nextjs.org/docs/app/getting-started/installation), [Tailwind with Next.js](https://tailwindcss.com/docs/installation/framework-guides/nextjs), [Intl.DateTimeFormat](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat).
+Before changing a feature, follow [CHANGE_GUIDE.md](docs/CHANGE_GUIDE.md) and use [FEATURE_MAP.md](docs/FEATURE_MAP.md) to inspect the relevant source. Preserve unrelated functionality, the existing design, authoritative records, and uncommitted work. Update affected documentation with implementation changes.

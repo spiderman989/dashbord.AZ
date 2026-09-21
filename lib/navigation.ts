@@ -1,4 +1,4 @@
-import { LayoutDashboard, Workflow, UsersRound, Phone, Ticket, Newspaper, GraduationCap, Images, Megaphone, History } from "lucide-react";
+import { LayoutDashboard, Workflow, UsersRound, Phone, Ticket, Newspaper, GraduationCap, Images, Megaphone, History, MessageSquare } from "lucide-react";
 export const employeeNavigation = [
   { href: "/", label: "میز کار", icon: LayoutDashboard },
   { href: "/processes", label: "فرآیندها", icon: Workflow },
@@ -7,6 +7,7 @@ export const employeeNavigation = [
   { href: "/tickets", label: "تیکت", icon: Ticket },
   { href: "/news", label: "اخبار", icon: Newspaper },
   { href: "/courses", label: "آموزش", icon: GraduationCap },
+  { href: "/feedback", label: "صندوق انتقادات و پیشنهادات", icon: MessageSquare },
 ];
 export const adminNavigation = [
   { href: "/admin", label: "داشبورد", icon: LayoutDashboard },
@@ -17,4 +18,5 @@ export const adminNavigation = [
   { href: "/admin/processes", label: "فرآیندها", icon: Workflow },
   { href: "/admin/activities", label: "فعالیت‌ها", icon: History },
   { href: "/admin/phone-directory", label: "شماره‌های داخلی", icon: Phone },
+  { href: "/admin/employees", label: "مدیریت کارکنان", icon: UsersRound },
 ];

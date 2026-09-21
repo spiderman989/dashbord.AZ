@@ -60,20 +60,31 @@
         })),
         snapshot: await page.locator("body").ariaSnapshot(),
         labels: await page.locator("label").allTextContents(),
-        exactPersonnelLabelMatches: await page.getByLabel("کد پرسنلی", { exact: true }).count(),
-        partialPersonnelLabelMatches: await page.getByLabel("کد پرسنلی").count(),
+        exactUsernameLabelMatches: await page.getByLabel("نام کاربری", { exact: true }).count(),
+        partialUsernameLabelMatches: await page.getByLabel("نام کاربری").count(),
       };
       await audit("inspection");
       await page.screenshot({ path: "test-results/inspection.png", fullPage: true });
       console.log(JSON.stringify(report, null, 2));
       return;
     }
-    await check("employee login, validation, Persian digits and protected routes", async () => {
+    await check("employee username/password login, validation and protected routes", async () => {
       await go("/"); assert.equal(new URL(page.url()).pathname, "/login");
       await audit("employee login desktop");
-      await field("کد پرسنلی").fill("1001"); await field("کد ملی").fill("0012345679");
+      assert.equal(await field("نام کاربری").getAttribute("inputmode"), "text");
+      assert.equal(await field("رمز عبور").getAttribute("inputmode"), "text");
+      assert.equal(await field("رمز عبور").getAttribute("maxlength"), "80");
+      await page.getByRole("button", { name: "ورود", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "نام کاربری را وارد کنید" }).waitFor();
+      await field("نام کاربری").fill("employee"); await field("رمز عبور").fill("   ");
+      await page.getByRole("button", { name: "ورود", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "رمز عبور را وارد کنید" }).waitFor();
+      await field("رمز عبور").fill("short"); await page.getByRole("button", { name: "ورود", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "۶ تا ۸۰" }).waitFor();
+      await field("نام کاربری").fill("bad username"); await field("رمز عبور").fill("employee123");
+      await page.getByRole("button", { name: "ورود", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "نام کاربری باید" }).waitFor();
+      await field("نام کاربری").fill("employee"); await field("رمز عبور").fill("Employee123");
       await page.getByRole("button", { name: "ورود", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "نادرست" }).waitFor();
-      await field("کد پرسنلی").fill("۱۰۰۱"); await field("کد ملی").fill("۰۰۱۲۳۴۵۶۷۸"); await page.getByRole("button", { name: "ورود", exact: true }).click();
+      await field("رمز عبور").fill("employee123");
+      await page.screenshot({ path: "test-results/employee-login-desktop.png", fullPage: true });
+      await field("نام کاربری").fill(" EMPLOYEE "); await page.getByRole("button", { name: "ورود", exact: true }).click();
       await page.waitForURL(base + "/"); await page.getByRole("heading", { name: "میز کار شما" }).waitFor();
       assert.ok(await page.locator(".topbar-user").innerText().then((text) => text.includes("علی محمدی")));
       await page.screenshot({ path: "test-results/portal-desktop.png", fullPage: true }); await audit("employee dashboard desktop");
@@ -108,6 +119,93 @@
       await go("/admin"); assert.equal(new URL(page.url()).pathname, "/admin/login");
       await field("نام کاربری").fill("admin"); await field("رمز عبور").fill("wrong-password"); await page.getByRole("button", { name: "ورود", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "نادرست" }).waitFor();
       await field("رمز عبور").fill("admin123"); await page.getByRole("button", { name: "ورود", exact: true }).click(); await page.waitForURL(base + "/admin"); await page.getByRole("heading", { name: "نبض پورتال در دستان شما" }).waitFor(); await page.screenshot({ path: "test-results/admin-desktop.png", fullPage: true }); await audit("admin dashboard desktop");
+    });
+    await check("local employee management validation, CRUD, cross-tab persistence and confirmation", async () => {
+      await go("/admin/employees");
+      await page.getByRole("heading", { name: "هنوز کارمندی ثبت نشده است." }).waitFor();
+      assert.equal(await page.getByRole("link", { name: "مدیریت کارکنان", exact: true }).getAttribute("aria-current"), "page");
+      const employeeTab = await context.newPage(); watchErrors(employeeTab);
+      await employeeTab.goto(base + "/admin/employees", { waitUntil: "networkidle" });
+      await page.getByRole("button", { name: "افزودن کارمند", exact: true }).click();
+      await page.getByRole("button", { name: "ذخیره", exact: true }).click();
+      await page.getByRole("alert").filter({ hasText: "نام" }).waitFor();
+      await field("نام").fill("   "); await field("نام خانوادگی").fill("رضایی"); await field("پست / سمت سازمانی").fill("کارشناس منابع انسانی");
+      await field("نام کاربری").fill("bad username"); await field("رمز عبور").fill("123");
+      await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "«نام»" }).waitFor();
+      await field("نام").fill("مهسا");
+      await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "نام کاربری باید" }).waitFor();
+      await field("نام کاربری").fill(" qa.employee ");
+      await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "رمز عبور آزمایشی" }).waitFor();
+      await field("رمز عبور").fill("demo123"); await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await toast("کارمند با موفقیت افزوده شد.");
+      await employeeTab.getByRole("cell", { name: "کارشناس منابع انسانی", exact: true }).waitFor();
+      assert.equal(await page.locator("tbody tr").count(), 1);
+      assert.ok(!(await page.locator("tbody").innerText()).includes("demo123"));
+      await page.getByRole("button", { name: "افزودن کارمند", exact: true }).click();
+      await field("نام").fill("رضا"); await field("نام خانوادگی").fill("احمدی"); await field("پست / سمت سازمانی").fill("کارشناس فروش"); await field("نام کاربری").fill("QA.EMPLOYEE"); await field("رمز عبور").fill("demo456");
+      await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "قبلاً ثبت شده" }).waitFor();
+      await page.getByRole("button", { name: "انصراف", exact: true }).click();
+      await page.getByRole("button", { name: "ویرایش مهسا رضایی", exact: true }).click();
+      assert.equal(await field("رمز عبور").inputValue(), "");
+      await field("نام").fill("مریم"); await field("نام خانوادگی").fill("احمدی"); await field("پست / سمت سازمانی").fill("مدیر منابع انسانی"); await field("نام کاربری").fill("qa.manager");
+      await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await toast("اطلاعات کارمند با موفقیت ویرایش شد.");
+      await employeeTab.getByRole("cell", { name: "مدیر منابع انسانی", exact: true }).waitFor();
+      await page.reload({ waitUntil: "networkidle" }); await page.getByRole("cell", { name: "qa.manager", exact: true }).waitFor();
+      const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("azarshin.portal.v1.employees")));
+      assert.equal(stored.length, 1); assert.equal(stored[0].password, "demo123"); assert.equal(stored[0].firstName, "مریم"); assert.equal(stored[0].lastName, "احمدی");
+      await page.getByRole("searchbox").fill("مدیر منابع انسانی"); assert.equal(await page.locator("tbody tr").count(), 1);
+      await page.getByRole("searchbox").fill("نامناموجود"); await page.getByRole("heading", { name: "نتیجه‌ای برای جستجوی شما پیدا نشد." }).waitFor();
+      await page.getByRole("button", { name: "پاک کردن فیلترها", exact: true }).last().click();
+      await page.screenshot({ path: "test-results/employees-desktop.png", fullPage: true }); await audit("employee management desktop");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.getByRole("button", { name: "ویرایش مریم احمدی", exact: true }).click();
+      await field("رمز عبور").fill("changed456");
+      await page.screenshot({ path: "test-results/employee-form-mobile.png", fullPage: true }); await audit("employee editor mobile");
+      await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await toast("اطلاعات کارمند با موفقیت ویرایش شد.");
+      assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("azarshin.portal.v1.employees"))[0].password), "changed456");
+      await page.screenshot({ path: "test-results/employees-mobile.png", fullPage: true }); await audit("employee management mobile");
+      await page.getByRole("button", { name: "حذف مریم احمدی", exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "انصراف", exact: true }).click(); assert.equal(await page.locator("tbody tr").count(), 1);
+      await page.getByRole("button", { name: "حذف مریم احمدی", exact: true }).click();
+      await page.getByRole("dialog").getByRole("button", { name: "حذف", exact: true }).click(); await toast("کارمند با موفقیت حذف شد.");
+      await employeeTab.getByRole("heading", { name: "هنوز کارمندی ثبت نشده است." }).waitFor(); await employeeTab.close();
+      await page.reload({ waitUntil: "networkidle" }); await page.getByRole("heading", { name: "هنوز کارمندی ثبت نشده است." }).waitFor();
+      await page.getByRole("button", { name: "باز کردن منو", exact: true }).click();
+      await page.getByRole("dialog").getByRole("link", { name: "مدیریت کارکنان", exact: true }).click(); assert.equal(await page.getByRole("dialog").count(), 0);
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    });
+    await check("feedback has exactly two types, Persian validation, local history and employee isolation", async () => {
+      await go("/feedback");
+      await page.getByRole("heading", { name: "هنوز پیامی ثبت نکرده‌اید." }).waitFor();
+      assert.equal(await page.getByRole("link", { name: "صندوق انتقادات و پیشنهادات", exact: true }).getAttribute("aria-current"), "page");
+      assert.deepEqual(await field("نوع پیام").locator("option").evaluateAll((options) => options.filter((option) => option.value).map((option) => option.value)), ["suggestion", "criticism"]);
+      await page.getByRole("button", { name: "ارسال پیام", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "نوع پیام" }).waitFor();
+      await field("نوع پیام").selectOption("suggestion"); await field("عنوان").fill("   ");
+      await page.getByRole("button", { name: "ارسال پیام", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "عنوان پیام" }).waitFor();
+      await field("عنوان").fill("  پیشنهاد بهبود فضای کار  "); await field("متن پیام").fill("          ");
+      await page.getByRole("button", { name: "ارسال پیام", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "متن پیام" }).waitFor();
+      const feedbackTab = await context.newPage(); watchErrors(feedbackTab); await feedbackTab.goto(base + "/feedback", { waitUntil: "networkidle" });
+      await field("متن پیام").fill("  پیشنهاد می‌کنم زمان مشخصی برای گفت‌وگوی همکاران در نظر بگیریم.  ");
+      await page.getByRole("button", { name: "ارسال پیام", exact: true }).click(); await toast("پیام شما با موفقیت ثبت شد.");
+      await feedbackTab.getByRole("cell", { name: "پیشنهاد بهبود فضای کار", exact: true }).waitFor();
+      assert.equal(await field("نوع پیام").inputValue(), ""); assert.equal(await field("عنوان").inputValue(), ""); assert.equal(await field("متن پیام").inputValue(), "");
+      await field("نوع پیام").selectOption("criticism"); await field("عنوان").fill("انتقاد از تأخیر اطلاع‌رسانی"); await field("متن پیام").fill("اطلاع‌رسانی تغییر ساعت جلسه‌ها باید زودتر و با جزئیات کافی انجام شود.");
+      await page.screenshot({ path: "test-results/feedback-desktop.png", fullPage: true }); await audit("feedback desktop");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.getByRole("button", { name: "ارسال پیام", exact: true }).click(); await toast("پیام شما با موفقیت ثبت شد.");
+      await feedbackTab.getByRole("cell", { name: "انتقاد از تأخیر اطلاع‌رسانی", exact: true }).waitFor(); await feedbackTab.close();
+      const stored = await page.evaluate(() => JSON.parse(localStorage.getItem("azarshin.portal.v1.feedback")));
+      assert.equal(stored.length, 2); assert.deepEqual(stored.map((item) => item.type), ["criticism", "suggestion"]);
+      assert.ok(stored.every((item) => item.employeeId === "employee-1001" && item.status === "submitted" && Number.isFinite(Date.parse(item.createdAt))));
+      assert.equal(stored[1].subject, "پیشنهاد بهبود فضای کار"); assert.equal(stored[1].message, stored[1].message.trim());
+      await page.evaluate(() => {
+        const key = "azarshin.portal.v1.feedback"; const items = JSON.parse(localStorage.getItem(key));
+        localStorage.setItem(key, JSON.stringify([...items, { ...items[0], id: "qa-other-feedback", employeeId: "another-employee", subject: "پیام همکار دیگر" }]));
+      });
+      await page.reload({ waitUntil: "networkidle" }); assert.equal(await page.locator("tbody tr").count(), 2); assert.equal(await page.getByText("پیام همکار دیگر", { exact: true }).count(), 0);
+      await page.screenshot({ path: "test-results/feedback-mobile.png", fullPage: true }); await audit("feedback mobile");
+      await page.getByRole("button", { name: "باز کردن منو", exact: true }).click();
+      await page.getByRole("dialog").getByRole("link", { name: "صندوق انتقادات و پیشنهادات", exact: true }).click(); assert.equal(await page.getByRole("dialog").count(), 0);
+      await page.setViewportSize({ width: 1440, height: 1000 });
     });
     await check("admin news create, preview, publish, cross-portal persistence and delete", async () => {
       await go("/admin/news/new"); await field("عنوان").fill("خبر آزمایشی QA"); await field("خلاصه خبر").fill("این خلاصه خبر برای بررسی گردش کامل مدیریت محتوای پورتال ثبت شده است."); await field("متن خبر").fill("این متن آزمایشی برای بررسی ایجاد، انتشار، ویرایش و حذف خبر است."); await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await page.waitForURL(base + "/admin/news");
@@ -147,9 +245,11 @@
       await go("/admin/activities"); assert.equal(await page.locator("tbody tr").count(), 6); await page.getByRole("button", { name: "صفحه بعد", exact: true }).click(); await page.getByRole("searchbox").fill("خبر ایجاد شد"); assert.ok(await page.locator("tbody tr").count() >= 1);
     });
     const routes = ["/login", "/", "/processes", "/processes/process-1", "/processes/new", "/phone-directory", "/admin/login", "/admin", "/admin/news", "/admin/news/new", "/admin/news/news-1", "/admin/courses", "/admin/courses/new", "/admin/courses/course-1", "/admin/gallery", "/admin/announcements", "/admin/processes", "/admin/activities", "/admin/phone-directory", "/crm", "/tickets", "/news", "/news/news-1", "/courses", "/activities", "/announcements"];
+    routes.push("/admin/employees", "/feedback");
     for (const width of [1440, 390]) { for (const path of routes) { await layout(path, width); } console.log(`Verified ${routes.length} routes at ${width}px`); }
     for (const width of [1920, 1280, 1024, 768, 360]) { for (const path of ["/", "/processes", "/phone-directory", "/admin", "/admin/news", "/admin/phone-directory"]) await layout(path, width); console.log(`Verified responsive layouts at ${width}px`); }
     for (const width of [360, 768]) { for (const path of ["/admin/courses/new", "/admin/courses/course-1"]) await layout(path, width); }
+    for (const width of [1920, 1280, 1024, 768, 360]) { for (const path of ["/admin/employees", "/feedback"]) await layout(path, width); }
     await check("mobile drawer, navigation, dialog keyboard behavior and logout", async () => {
       await page.setViewportSize({ width: 390, height: 844 }); await go("/"); await page.screenshot({ path: "test-results/portal-mobile.png", fullPage: true }); await audit("employee dashboard mobile");
       await page.getByRole("button", { name: "باز کردن منو", exact: true }).click(); await page.getByRole("dialog").getByRole("link", { name: "شماره‌های داخلی", exact: true }).click(); await page.waitForURL(base + "/phone-directory"); assert.equal(await page.getByRole("dialog").count(), 0); await page.screenshot({ path: "test-results/directory-mobile.png", fullPage: true });
@@ -160,6 +260,60 @@
       await go("/admin/courses/new"); await audit("admin course form mobile"); await page.screenshot({ path: "test-results/admin-course-mobile.png", fullPage: true });
       await go("/"); await page.getByRole("button", { name: "نمایش پروفایل", exact: true }).click(); await page.getByRole("button", { name: "خروج از حساب", exact: true }).click(); await page.waitForURL(base + "/login");
       await go("/admin"); await page.getByRole("button", { name: "نمایش پروفایل", exact: true }).click(); await page.getByRole("button", { name: "خروج از حساب", exact: true }).click(); await page.waitForURL(base + "/admin/login"); await page.screenshot({ path: "test-results/login-mobile.png", fullPage: true }); await audit("admin login mobile");
+    });
+    await check("managed employee login, exact passwords, persistent identity, credential edits and deletion", async () => {
+      await go("/admin/login"); await field("نام کاربری").fill("admin"); await field("رمز عبور").fill("admin123");
+      await page.getByRole("button", { name: "ورود", exact: true }).click(); await page.waitForURL(base + "/admin");
+      await go("/admin/employees"); await page.getByRole("button", { name: "افزودن کارمند", exact: true }).click();
+      const username = "qa.user." + "x".repeat(32); const password = "Local۱۲3! pass  "; const updatedPassword = "Updated۴56!";
+      await field("نام").fill("سارا"); await field("نام خانوادگی").fill("احمدی"); await field("پست / سمت سازمانی").fill("کارشناس آموزش");
+      await field("نام کاربری").fill("employee"); await field("رمز عبور").fill(password);
+      await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "رزرو شده" }).waitFor();
+      await field("نام کاربری").fill(username); await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await toast("کارمند با موفقیت افزوده شد.");
+      const account = await page.evaluate(() => JSON.parse(localStorage.getItem("azarshin.portal.v1.employees"))[0]);
+      const employeeTab = await context.newPage(); watchErrors(employeeTab); await employeeTab.setViewportSize({ width: 390, height: 844 });
+      const employeeField = (name) => employeeTab.getByLabel(new RegExp("^" + name + "(?:\\s*\\*)?$"));
+      const signIn = async (identity, secret) => {
+        await employeeField("نام کاربری").fill(identity); await employeeField("رمز عبور").fill(secret);
+        await employeeTab.getByRole("button", { name: "ورود", exact: true }).click();
+      };
+      const rejected = async () => {
+        await employeeTab.waitForFunction(() => document.querySelector(".login-submit")?.disabled === false);
+        await employeeTab.getByRole("alert").filter({ hasText: "نام کاربری یا رمز عبور نادرست" }).waitFor();
+        assert.equal(new URL(employeeTab.url()).pathname, "/login");
+      };
+      await employeeTab.goto(base + "/login", { waitUntil: "networkidle" });
+      await employeeTab.screenshot({ path: "test-results/employee-login-mobile.png", fullPage: true });
+      for (const invalid of [password.trim(), password.replace("۱۲", "12"), password.toLowerCase()]) { await signIn(username, invalid); await rejected(); }
+      assert.equal(await employeeTab.evaluate(() => localStorage.getItem("azarshin.demo.employee")), null);
+      await employeeField("رمز عبور").fill(password); await employeeTab.getByRole("button", { name: "نمایش رمز", exact: true }).click();
+      assert.equal(await employeeField("رمز عبور").getAttribute("type"), "text"); assert.equal(await employeeField("رمز عبور").inputValue(), password);
+      await employeeTab.getByRole("button", { name: "پنهان کردن رمز", exact: true }).click();
+      await signIn(username.toUpperCase(), password); await employeeTab.waitForURL(base + "/");
+      await employeeTab.getByRole("heading", { name: "میز کار شما" }).waitFor();
+      assert.ok((await employeeTab.locator(".topbar-user").innerText()).includes("سارا احمدی"));
+      assert.equal(await employeeTab.evaluate(() => localStorage.getItem("azarshin.demo.employee")), account.id);
+      await employeeTab.reload({ waitUntil: "networkidle" }); await employeeTab.getByRole("button", { name: "نمایش پروفایل", exact: true }).click();
+      await employeeTab.getByRole("dialog").getByText(username, { exact: true }).waitFor();
+      assert.equal(await employeeTab.getByRole("dialog").evaluate((dialog) => dialog.scrollWidth <= dialog.clientWidth + 1), true);
+      await employeeTab.keyboard.press("Escape");
+      await employeeTab.goto(base + "/feedback", { waitUntil: "networkidle" });
+      await employeeTab.getByRole("heading", { name: "هنوز پیامی ثبت نکرده‌اید." }).waitFor();
+      await employeeField("نوع پیام").selectOption("suggestion"); await employeeField("عنوان").fill("پیام حساب محلی QA"); await employeeField("متن پیام").fill("این پیام برای بررسی ارتباط بازخورد با حساب کارمند واردشده ثبت می‌شود.");
+      await employeeTab.getByRole("button", { name: "ارسال پیام", exact: true }).click();
+      await employeeTab.getByRole("cell", { name: "پیام حساب محلی QA", exact: true }).waitFor();
+      assert.equal(await employeeTab.evaluate(() => JSON.parse(localStorage.getItem("azarshin.portal.v1.feedback")).find((item) => item.subject === "پیام حساب محلی QA").employeeId), account.id);
+      await page.getByRole("button", { name: "ویرایش سارا احمدی", exact: true }).click();
+      await field("نام کاربری").fill("qa.updated"); await field("رمز عبور").fill(updatedPassword); await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await toast("اطلاعات کارمند با موفقیت ویرایش شد.");
+      await employeeTab.reload({ waitUntil: "networkidle" }); await employeeTab.getByRole("cell", { name: "پیام حساب محلی QA", exact: true }).waitFor();
+      await employeeTab.getByRole("button", { name: "نمایش پروفایل", exact: true }).click(); await employeeTab.getByRole("dialog").getByText("qa.updated", { exact: true }).waitFor();
+      await employeeTab.getByRole("button", { name: "خروج از حساب", exact: true }).click(); await employeeTab.waitForURL(base + "/login");
+      await signIn(username, updatedPassword); await rejected(); await signIn("qa.updated", password); await rejected();
+      await signIn("qa.updated", updatedPassword); await employeeTab.waitForURL(base + "/"); await employeeTab.getByRole("heading", { name: "میز کار شما" }).waitFor();
+      await page.getByRole("button", { name: "حذف سارا احمدی", exact: true }).click(); await page.getByRole("dialog").getByRole("button", { name: "حذف", exact: true }).click(); await toast("کارمند با موفقیت حذف شد.");
+      await employeeTab.reload({ waitUntil: "networkidle" }); await employeeTab.waitForURL(base + "/login");
+      await signIn("qa.updated", updatedPassword); await rejected(); await employeeTab.close();
+      await go("/login"); await audit("employee login mobile");
     });
     assert.deepEqual(report.overflow, [], "No horizontal overflow at any tested breakpoint");
     assert.deepEqual(report.images, [], "No missing images");
