@@ -1,6 +1,6 @@
 # AI context
 
-**Start here for future coding tasks.** Audited 2026-09-19 against the working tree. Use [INDEX.md](INDEX.md) for topics, [FEATURE_MAP.md](FEATURE_MAP.md) for file selection, and [CHANGE_GUIDE.md](CHANGE_GUIDE.md) for the workflow. Inspect relevant source before editing; do not rescan the entire project for a routine change.
+**Start here for future coding tasks.** Audited 2026-09-19; section-permission contracts updated 2026-09-25 against relevant source. Use [INDEX.md](INDEX.md) for topics, [FEATURE_MAP.md](FEATURE_MAP.md) for file selection, and [CHANGE_GUIDE.md](CHANGE_GUIDE.md) for the workflow. Inspect relevant source before editing; do not rescan the entire project for a routine change.
 
 ## Project and stack
 
@@ -12,7 +12,7 @@ Persian RTL employee portal and admin panel for آذرشین. Next App Router + 
 
 - [app/layout.tsx](../app/layout.tsx): `lang=fa`, `dir=rtl`, font, metadata, ToastProvider. [app/globals.css](../app/globals.css): existing design and responsive system, with the user-supplied `public/assets/site-background.jpg` as a fixed backdrop on all pages.
 - [Employee layout](<../app/(employee)/layout.tsx>): AuthGuard → PortalShell + InfoRail. [Admin layout](<../app/admin/(panel)/layout.tsx>): AuthGuard admin → PortalShell admin. Group names do not appear in URLs.
-- [lib/navigation.ts](../lib/navigation.ts): ordered menus; add only required entries. [ROUTES.md](ROUTES.md): all 28 page paths.
+- [lib/permissions.ts](../lib/permissions.ts): shared section IDs/route allowlist; [lib/navigation.ts](../lib/navigation.ts): derived ordered menus. [ROUTES.md](ROUTES.md): 29 feature/login pages plus two denying catch-all wrappers.
 - [components/employee/](../components/employee/), [components/admin/](../components/admin/): feature behavior. [components/shared/](../components/shared/), [components/ui/](../components/ui/): shell/auth/assets/tables/forms/dialogs/states/toasts.
 - [services/mockRepository.ts](../services/mockRepository.ts): sole collection persistence adapter. [hooks/useResource.ts](../hooks/useResource.ts): subscribed data/loading/error/reload. [types/index.ts](../types/index.ts): all domain contracts.
 - [data/](../data/): demo seeds, except authoritative [phoneDirectory.ts](../data/phoneDirectory.ts). [lib/date.ts](../lib/date.ts), [lib/utils.ts](../lib/utils.ts), [lib/labels.ts](../lib/labels.ts): calendar, normalization/link/error helpers, Persian enum labels.
@@ -35,11 +35,15 @@ Exact files and cross-feature edges are in FEATURE_MAP. News/courses use routed 
 
 ## Authentication and permissions
 
-Login is username/password: demo employee `employee` / `employee123`, admin `admin` / `admin123`. Admin-created accounts can sign in locally. Employee usernames are trimmed/case-insensitive; passwords match exactly, including spaces and digit forms. See [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md) for full rules.
+**Page/link management added 2026-09-27:** `/admin/links` is primary-admin-only with a fixed destination. [pageLinks.ts](../lib/pageLinks.ts) derives editable builtins from the real menus and merges UUID custom items; [pageLinksService](../services/pageLinksService.ts) persists shared origin/browser settings using the existing adapter with read validation. Custom IDs participate in the existing permissionService/editor, default denied except SUPER_ADMIN. `useAccess` + PermissionLink/MenuLink centrally resolve section entries, gate until settings load and check internal destination grants; detail/query URLs retain their explicit intent. No custom route or backend is created. See FEATURES, STATE_MANAGEMENT and API_AND_DATA for contracts. There are now 31 page routes.
+
+**Deletion expanded 2026-09-28:** every page/link row is deletable, including builtins and the fixed-destination `admin.links` menu entry. Builtin removals persist as optional `deleted: true` overrides; pages, content and section grants remain, and the primary admin can still open `/admin/links` directly. Custom deletion keeps its existing permission cleanup.
+
+Login is username/password: demo employee `employee` / `employee123`, primary `SUPER_ADMIN` admin `admin` / `admin123`. Managed accounts sign in locally; admin login additionally requires the saved admin-entry flag. Employee usernames are trimmed/case-insensitive; passwords match exactly, including spaces and digit forms. See [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md) for full rules.
 
 Session keys `azarshin.demo.employee` and `azarshin.demo.admin` hold IDs independently. EmployeeAccount stores names/position/username/plaintext password; authService projects it to Employee context, mapping position to the existing department field. Phone-directory records are separate. Keep stable IDs on edits.
 
-AuthGuard is client-only. Common admin roles: ADMIN/SUPER_ADMIN/HR/CONTENT_MANAGER, but only built-in ADMIN is supplied; managed accounts are EMPLOYEE. No granular permissions. Own process/ticket/feedback records filter employeeId. Process activities filter display name; other activity types and notifications are shared. Guards do not subscribe to session/account changes: deletion/edits are reflected on guard remount/reload, not immediately everywhere.
+AuthGuard resolves identity and section grants before content mounts and subscribes to session/account/permission updates. The primary demo role is SUPER_ADMIN; managed identities are EMPLOYEE/ADMIN by panel, with no permission-management capability. [permissionService](../services/permissionService.ts) persists independent employee/admin sections by account ID; managed accounts default to no grants. [useAccess](../hooks/useAccess.ts), SectionGuard and PermissionLink share the route allowlist; unknown routes deny by default. First allowed pages/empty states handle login and live revocation. Own process/ticket/feedback records still filter employeeId; process activities use names, other activities/notifications remain shared.
 
 ## Conventions and constraints
 
@@ -52,8 +56,8 @@ AuthGuard is client-only. Common admin roles: ADMIN/SUPER_ADMIN/HR/CONTENT_MANAG
 
 ## Limits and validation
 
-No secure/multi-device persistence, migration, conflict resolution, transactions, cascade deletes, full runtime schemas, or immediate session revocation. Activities are not a complete audit log. Process progression, ticket replies, admin feedback review, and real CRM are NOT CURRENTLY IMPLEMENTED. Optional task URLs and declared roles are not evidence of integration. Deployment outside this tree is UNKNOWN — Requires source inspection.
+No secure/multi-device persistence, migration, conflict resolution, transactions, cascade deletes, full runtime schemas, or server-enforced session revocation. Activities are not a complete audit log. Process progression, ticket replies, admin feedback review, and real CRM are NOT CURRENTLY IMPLEMENTED. Optional task URLs and declared roles are not evidence of integration. Deployment outside this tree is UNKNOWN — Requires source inspection.
 
-Use `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` as appropriate. Browser suite: `npm run test:e2e`, requires a running server and installed Chrome; optional `PORTAL_TEST_URL`. It writes ignored test-results. Four domain tests cover authoritative directory, Persian search, calendar and link schemes. `node docs/check-docs.mjs` checks documentation structure/links/routes. Read DEVELOPMENT_GUIDE for precise commands and VALIDATION for dated evidence.
+Use `npm run lint`, `npm run typecheck`, `npm test`, and `npm run build` as appropriate. Browser suite: `npm run test:e2e`, requires a running server and installed Chrome; optional `PORTAL_TEST_URL`. It writes ignored test-results. Eleven domain tests cover authoritative directory, Persian search, calendar, full link validation and section authorization. `node scripts/qa-page-links.cjs` covers page/link scenarios on port 3102, with optional `--external-tab` and `--notifications` focused checks. `node scripts/qa-permissions.cjs` adds isolated permission scenarios; default port 3101. `node docs/check-docs.mjs` checks documentation structure/links/routes. Read DEVELOPMENT_GUIDE for precise commands and VALIDATION for dated evidence.
 
 Before editing, inspect the current diff and preserve pre-existing work. After a change, update relevant docs/maps and this summary if the project-level facts changed. Source wins over stale documentation; correct both within the task's scope.

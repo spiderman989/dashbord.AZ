@@ -30,7 +30,7 @@ Detailed flows and boundaries are in [FEATURES.md](FEATURES.md). Some sample con
 
 ## Roles and data flow
 
-The current usable identities are a built-in demo employee, a built-in demo admin, and local employee accounts created through the admin panel. The type system also declares `SUPER_ADMIN`, `HR`, and `CONTENT_MANAGER`; they are accepted by the common admin role check, but separate role provisioning and granular capabilities are NOT CURRENTLY IMPLEMENTED.
+The current usable identities are a built-in demo employee, an explicit primary `SUPER_ADMIN`, and local employee accounts. The primary admin assigns independent section grants and admin entry to managed accounts; managed admin identities use ADMIN without permission-management rights. Section permissions are implemented only as local UI behavior. Operation permissions and real role provisioning are NOT CURRENTLY IMPLEMENTED.
 
 The typical flow is:
 

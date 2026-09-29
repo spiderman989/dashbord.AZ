@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { PermissionLink as Link } from "@/components/shared/PermissionLink";
 import { ArrowUpLeft, FilePlus2, Workflow, Clock3, CircleAlert, CircleCheck } from "lucide-react";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { Badge, Card, PageHeading } from "@/components/ui/Primitives";

@@ -6,7 +6,7 @@ Component exports are usually named, while App Router wrappers default-export pa
 
 | Component / path | Props | State, dependencies, and behavior | Modification considerations |
 | --- | --- | --- | --- |
-| [AuthGuard / useEmployee](../components/shared/AuthGuard.tsx) | `admin?: boolean`, `children` | Identity/error state; authService and router; private EmployeeContext; loading/error/redirect flow | No storage subscription; must wrap consumers calling useEmployee; UI guard only |
+| [AuthGuard / useEmployee](../components/shared/AuthGuard.tsx) | `admin?: boolean`, `children` | Identity/grants/loading/error state; authService + permissionService; EmployeeContext + AccessContext | Subscribes to sessions/accounts/grants; stale async reads ignored; must wrap useEmployee/useAccess consumers; UI guards only |
 | [PortalShell](../components/shared/PortalShell.tsx) | `children`, `rail?: ReactNode`, `admin?: boolean` | Identity, pathname/router, navigation, notification resource; drawer/collapse/profile/notice local state | Both panels share this shell; mobile uses Modal; footer copyright excluded only at `/admin/employees` |
 | [LoginForm](../components/shared/LoginForm.tsx) | `admin?: boolean` | Identity/password/visible/busy/error; auth service, router, branding and form primitives | Shared labels are username/password; employee and admin validation differ |
 | [ActivityHistory](../components/shared/ActivityHistory.tsx) | `admin?: boolean` | Activity resource, identity; DataTable type filter/search/sort/date badges | Employee visibility is own-name process activities plus all other types |
@@ -73,7 +73,11 @@ Its private ImageUpload owns decode/read state and errors, accepts PNG/JPEG/WebP
 | [FeedbackPage](../components/employee/FeedbackPage.tsx) | No props; type/subject/message/busy/error | Feedback resource, submitFeedback, identity, history DataTable |
 | [AnnouncementsPage](../components/employee/AnnouncementsPage.tsx) | No props; resource state only | Active announcements, badges/date |
 | [AdminDashboard](../components/admin/AdminDashboard.tsx) | No props; six resources, derived counts | News/course/gallery/announcement/process/activity services; shared dashboard views |
-| [AdminEmployees](../components/admin/AdminEmployees.tsx) | No props; resource/editing/removing state | Employee service, DataTable, ConfirmDialog; internal EmployeeEditor accepts optional account + onClose, owns form/busy/error |
+| [AdminEmployees](../components/admin/AdminEmployees.tsx) | No props; resource/editing/removing/permission-target state | Employee service, DataTable, ConfirmDialog; internal EmployeeEditor and primary-admin-only PermissionEditor |
+| [PermissionEditor](../components/admin/PermissionEditor.tsx) | EmployeeAccount + onClose; draft/tab/busy/error state | Existing Modal and form controls; saves through permissionService; discard on close |
+| [PageLinksManager](../components/admin/PageLinksManager.tsx) | No props; panel/selection/draft/dialog state | Primary-admin-only; actual menu inventory, shared inline/modal editor, field errors, reset/delete feedback, dirty warnings, existing DataTable and primitives |
+| [SectionGuard](../components/shared/SectionGuard.tsx) | admin?, children | Page access/loading/denied/empty state inside shell |
+| [PermissionLink / MenuLink / SectionAccess](../components/shared/PermissionLink.tsx) | String href / stable menu ID / section ID + children | Shared useAccess resolves exact section-entry destinations, applies source and target grants; internal Next Link vs external anchor, safe new-tab rel. SectionAccess gates previews. SectionHeading now uses PermissionLink for its optional href. |
 | [AdminPhoneDirectory](../components/admin/AdminPhoneDirectory.tsx) | No props; resource/query/active/editor/removing/busy | Nested directory helpers; ContentForm/Modal/ConfirmDialog |
 | [ContentManager](../components/admin/ContentManager.tsx) | `kind: ContentKind`, `recordId?` | Dispatches internal ResourceList/ResourceEditor using typed configs |
 

@@ -1,5 +1,5 @@
 import { History, ArrowUpLeft } from "lucide-react";
-import Link from "next/link";
+import { PermissionLink as Link } from "@/components/shared/PermissionLink";
 import type { RecentActivity } from "@/types";
 import { Badge, Card, SectionHeading } from "@/components/ui/Primitives";
 import { activityStatusLabels } from "@/lib/labels";

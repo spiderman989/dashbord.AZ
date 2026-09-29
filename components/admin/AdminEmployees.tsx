@@ -1,11 +1,13 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import { Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { Pencil, Plus, Save, ShieldCheck, Trash2 } from "lucide-react";
 import { Badge, Button, Card, Field, Input, PageHeading } from "@/components/ui/Primitives";
 import { DataTable, type Column } from "@/components/ui/DataTable";
 import { ConfirmDialog, Modal } from "@/components/ui/Modal";
 import { EmptyState } from "@/components/ui/States";
 import { useToast } from "@/components/ui/Toast";
+import { useAccess } from "@/hooks/useAccess";
+import { PermissionEditor } from "./PermissionEditor";
 import { useResource } from "@/hooks/useResource";
 import { employeeService, saveEmployee } from "@/services/employeeService";
 import { errorMessage, faNumber } from "@/lib/utils";
@@ -13,6 +15,8 @@ import type { EmployeeAccount } from "@/types";
 
 export function AdminEmployees() {
   const resource = useResource(employeeService);
+  const access = useAccess();
+  const [permissionsFor, setPermissionsFor] = useState<EmployeeAccount | null>(null);
   const toast = useToast();
   const [editing, setEditing] = useState<EmployeeAccount | "new" | null>(null);
   const [removing, setRemoving] = useState<EmployeeAccount | null>(null);
@@ -22,6 +26,7 @@ export function AdminEmployees() {
     { key: "position", label: "پست / سمت سازمانی", sortValue: (item) => item.position, render: (item) => <strong>{item.position}</strong> },
     { key: "username", label: "نام کاربری", sortValue: (item) => item.username, render: (item) => <bdi>{item.username}</bdi> },
     { key: "actions", label: "عملیات", className: "actions-cell", render: (item) => <div className="row-actions">
+      {access.canManagePermissions && <Button type="button" variant="ghost" className="permission-action" aria-label={`سطح دسترسی ${item.firstName} ${item.lastName}`} onClick={() => setPermissionsFor(item)}><ShieldCheck size={16} />سطح دسترسی</Button>}
       <button type="button" className="icon-button" aria-label={`ویرایش ${item.firstName} ${item.lastName}`} onClick={() => setEditing(item)}><Pencil size={15} /></button>
       <button type="button" className="icon-button delete-action" aria-label={`حذف ${item.firstName} ${item.lastName}`} onClick={() => setRemoving(item)}><Trash2 size={15} /></button>
     </div> },
@@ -37,6 +42,7 @@ export function AdminEmployees() {
         searchPlaceholder="جستجوی نام، سمت یا نام کاربری..." loading={resource.loading} error={resource.error} onRetry={resource.reload}
       />}
     </Card>
+    {permissionsFor && access.canManagePermissions && <PermissionEditor employee={permissionsFor} onClose={() => setPermissionsFor(null)} />}
     {editing && <EmployeeEditor employee={editing === "new" ? undefined : editing} onClose={() => setEditing(null)} />}
     {removing && <ConfirmDialog title="حذف کارمند" description={`کارمند «${removing.firstName} ${removing.lastName}» با سمت «${removing.position}» حذف شود؟ این کار قابل بازگشت نیست.`} onClose={() => setRemoving(null)} onConfirm={async () => {
       await employeeService.remove(removing.id);

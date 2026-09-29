@@ -271,6 +271,12 @@
       await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await page.getByRole("alert").filter({ hasText: "رزرو شده" }).waitFor();
       await field("نام کاربری").fill(username); await page.getByRole("button", { name: "ذخیره", exact: true }).click(); await toast("کارمند با موفقیت افزوده شد.");
       const account = await page.evaluate(() => JSON.parse(localStorage.getItem("azarshin.portal.v1.employees"))[0]);
+      // Managed accounts start without grants; authorize this existing login fixture through the UI.
+      await page.getByRole("button", { name: "سطح دسترسی سارا احمدی", exact: true }).click();
+      await page.getByRole("dialog").getByRole("checkbox", { name: "میز کار", exact: true }).check();
+      await page.getByRole("dialog").getByRole("checkbox", { name: "صندوق انتقادات و پیشنهادات", exact: true }).check();
+      await page.getByRole("dialog").getByRole("button", { name: "ذخیره تغییرات", exact: true }).click();
+      await toast("سطح دسترسی با موفقیت ذخیره شد.");
       const employeeTab = await context.newPage(); watchErrors(employeeTab); await employeeTab.setViewportSize({ width: 390, height: 844 });
       const employeeField = (name) => employeeTab.getByLabel(new RegExp("^" + name + "(?:\\s*\\*)?$"));
       const signIn = async (identity, secret) => {

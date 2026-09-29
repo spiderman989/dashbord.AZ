@@ -1,6 +1,6 @@
 "use client";
 import { useState, type FormEvent } from "react";
-import Link from "next/link";
+import { PermissionLink as Link } from "@/components/shared/PermissionLink";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Send } from "lucide-react";
 import { Button, Card, Field, Input, PageHeading, Select, Textarea } from "@/components/ui/Primitives";

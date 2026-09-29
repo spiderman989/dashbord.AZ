@@ -4,7 +4,7 @@
 
 **The business functionality is frontend-only.** There are no application HTTP endpoints, route handlers, server actions, database models/connections, external data fetches, or real backend authentication in this repository. Next.js rendering and static-asset requests are framework infrastructure, not a business API. Accordingly, endpoint request/response/authentication contracts are **NOT CURRENTLY IMPLEMENTED**.
 
-The async functions in [services/](../services/) are local TypeScript interfaces. They must not be described as REST endpoints. [types/index.ts](../types/index.ts) is the shared model authority; [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) lists storage keys and seeds.
+The async functions in [services/](../services/) are local TypeScript interfaces. They must not be described as REST endpoints. [types/index.ts](../types/index.ts) and the section contracts in [lib/permissions.ts](../lib/permissions.ts) define the shared models; [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) lists storage keys and seeds.
 
 ## Repository contract
 
@@ -24,12 +24,16 @@ Mutation methods reject on storage failure and on attempted server-side writes. 
 
 ## Models
 
+The optional third `createMockRepository` argument is a domain decoder. Only the page-links collection opts into recovery from malformed JSON/records; the other collections retain their existing read-error behavior.
+
 Fields below are required unless marked `?`. Dates are strings; creation helpers use ISO timestamps, and editorial forms commonly use `YYYY-MM-DD`. These are interfaces, not database schemas.
 
 | Model | Fields and constraints in the type |
 | --- | --- |
 | `Employee` | `id`, `personnelCode`, `name`, `department`, `role: Role`, `username?`; session/profile projection, not an editable account |
 | `EmployeeAccount` | `id`, `firstName`, `lastName`, `position`, `username`, `password`; plaintext local mock credentials |
+| `UserPermissions` — [permission types](../lib/permissions.ts) | `id` (account ID), `employeeSections: SectionId[]`, `adminAccess: boolean`, `adminSections: SectionId[]`; separate from accounts and directory |
+| `PageLinkRecord` — [page link types](../lib/pageLinks.ts) | `id`, `panel`, `kind: builtin/custom`, `destination: {type: internal/external, href}`, `opening: same-tab/new-tab`; builtin adds optional boolean `deleted`; custom adds `label`, `icon`, finite numeric `order`, `active` |
 | `Feedback` | `id`, `employeeId`, `type: FeedbackType`, `subject`, `message`, `createdAt`, `status: "submitted"` |
 | `News` | `id`, `title`, `summary`, `content`, `image`, `date`, `category`, `author`, `status: ContentStatus` |
 | `Course` | `id`, `title`, `description`, `image`, `instructor`, `startDate`, `endDate`, `status: CourseStatus`, `link`, `category` |
@@ -56,9 +60,13 @@ Most status display labels come from [lib/labels.ts](../lib/labels.ts); feedback
 
 ## Domain helpers and validation
 
+[pageLinksService](../services/pageLinksService.ts) exposes list/subscribe, saveBuiltin/resetBuiltin/removeBuiltin and saveCustom/removeCustom. Every mutation rechecks the primary-admin session. Builtin IDs, labels, icons and grants come from the actual menu and cannot be edited. All menu entries can be deleted (2026-09-28); `admin.links` still cannot be redirected, and its protected page remains directly accessible to the primary admin after its menu entry is removed. `removeBuiltin` stores `deleted: true` with the original route; it leaves content and section grants intact. Save/reset rejects a builtin that has already been deleted. Existing overrides without `deleted` keep their previous behavior. Decoding validates removals before custom-title uniqueness, so a custom replacement can reuse a removed builtin's title regardless of stored record order. Custom IDs are generated once as `panel.custom.UUID`, and panel membership is immutable. [linkValidation](../lib/linkValidation.ts) collapses whitespace for title uniqueness, validates full HTTP/HTTPS URLs using the standard URL parser, rejects credentials, controls, backslashes, invalid ports and other schemes, and supports localhost, intranet/IP hosts, optional ports, paths and ordinary query parameters. No credentials or tokens are appended. Internal destinations must be a concrete same-panel route from the existing registry. No redirect chain is evaluated.
+
+The API integration boundaries are pageLinksService and permissionService. A future server must authorize changes, validate destination/ID contracts, handle concurrent writes and atomically remove the item and its grants. No API, server route, database or SSO integration is implemented by these frontend interfaces.
+
 | Contract and implementation | Validation / mutation rules |
 | --- | --- |
-| `saveEmployee(values, id?)` — [employeeService.ts](../services/employeeService.ts) | Trims names/position/username. First/last name: 2–60 characters; position: 2–100; each must contain a Unicode letter. Username: 3–40 ASCII letters/digits/`.`/`_`/`-`, starting alphanumeric; case-insensitive uniqueness. Reserves `employee` for new/renamed accounts, while retaining a legacy record already using it. Password: trimmed length ≥6 and original length ≤80, stored unchanged. Editing with exactly empty password retains the current one; spaces alone are invalid. Checks edit target still exists. |
+| `saveEmployee(values, id?)` — [employeeService.ts](../services/employeeService.ts) | Trims names/position/username. First/last name: 2–60 characters; position: 2–100; each must contain a Unicode letter. Username: 3–40 ASCII letters/digits/`.`/`_`/`-`, starting alphanumeric; case-insensitive uniqueness. Reserves `employee` and `admin` for new/renamed accounts, while retaining a legacy record with its unchanged username. Password: trimmed length ≥6 and original length ≤80, stored unchanged. Editing with exactly empty password retains the current one; spaces alone are invalid. Checks edit target still exists. |
 | `submitFeedback({employeeId,type,subject,message})` — [feedbackService.ts](../services/feedbackService.ts) | Type must be suggestion or criticism; trimmed subject 3–180, trimmed message 10–5000, each containing a Unicode letter or number. Employee ID must be nonblank. Creates timestamp and `submitted` status. Does not verify the identity against an account repository. |
 | `saveExtension(departmentId, extension, id?)`, `removeExtension(departmentId,id)` — [phoneDirectoryService.ts](../services/phoneDirectoryService.ts) | Reads the department and updates its nested array; extension creation generates an independent `ext-` UUID. Admin UI normalizes Persian/Arabic digits and requires 2–6 digits. It preserves manager text in parentheses. No uniqueness requirement for names or extension numbers. |
 | `logContentChange(title)` — [activityService.ts](../services/activityService.ts) | Creates content activity under the fixed display name مدیر سامانه; timestamp now, success status. |
@@ -68,6 +76,10 @@ Most status display labels come from [lib/labels.ts](../lib/labels.ts); feedback
 | Editorial forms — [ContentForm.tsx](../components/ui/ContentForm.tsx), [resourceConfig.tsx](../components/admin/resourceConfig.tsx) | Required fields and configured minimum lengths plus native constraints. Shared title 3–180; news summary 10–500, news body/course description ≥10; announcement text ≥5. Course end date cannot precede start; optional course link and required quick-process link must pass `safeHref`. Quick-process order is an integer ≥0 (zero is accepted despite the message saying positive). Gallery image is required. |
 
 Login normalization and password comparison belong to [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md). Validation is implemented manually; no schema or form-validation dependency is installed. Native browser validation and explicit Persian validation coexist. Account, feedback, and employee login forms use `noValidate` so their own Persian checks run.
+
+## Section permission service
+
+[permissionService](../services/permissionService.ts) is the replaceable local API boundary. `getForUser(identity)` derives primary-admin full access, reads/validates a saved record, or returns no managed grants. Unknown/cross-panel IDs never grant access. `saveForUser(userId, values)` rechecks the current SUPER_ADMIN session, rejects the primary-admin target and nonexistent accounts, and upserts one record through the existing repository. `subscribe` uses existing same-tab/native storage events. No operation permissions are defined. See [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md) for defaults, guarding and required future server enforcement.
 
 ## Data relationships and assets
 

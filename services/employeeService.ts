@@ -24,7 +24,7 @@ export async function saveEmployee(values: Omit<EmployeeAccount, "id">, id?: str
   const employees = await employeeService.list();
   const current = employees.find((item) => item.id === id);
   if (id && !current) throw new Error("این کارمند دیگر در فهرست وجود ندارد. فهرست را دوباره بررسی کنید.");
-  if (username.toLowerCase() === demoEmployeeCredentials.username && current?.username.toLowerCase() !== demoEmployeeCredentials.username) {
+  if ([demoEmployeeCredentials.username, "admin"].includes(username.toLowerCase()) && current?.username.toLowerCase() !== username.toLowerCase()) {
     throw new Error("این نام کاربری برای حساب نمونه رزرو شده است. نام کاربری دیگری انتخاب کنید.");
   }
   if (employees.some((item) => item.id !== id && item.username.toLowerCase() === username.toLowerCase())) {

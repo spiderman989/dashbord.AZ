@@ -1,4 +1,4 @@
-import Link from "next/link";
+import { PermissionLink as Link } from "@/components/shared/PermissionLink";
 import { ArrowUpLeft, ChartPie } from "lucide-react";
 import { Card, SectionHeading } from "@/components/ui/Primitives";
 import type { ProcessItem, ProcessStatus as Status } from "@/types";

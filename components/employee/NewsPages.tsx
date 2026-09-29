@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import { PermissionLink as Link } from "@/components/shared/PermissionLink";
 import { ArrowLeft, ArrowRight, CalendarDays, UserRound } from "lucide-react";
 import { Badge, Card, PageHeading, SearchInput, Select } from "@/components/ui/Primitives";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/States";

@@ -1,6 +1,6 @@
 # Project documentation
 
-Source audit: **2026-09-19**, against the current working tree, including the employee management, feedback, and username/password login changes. Documentation describes implemented behavior; source code remains the final authority when the two differ.
+Source audit: **2026-09-19**, with a scoped **2026-09-25** update for section permissions, independent panel entry and subscribed guards. Documentation describes implemented behavior; source code remains the final authority when the two differ.
 
 **For an AI development task, start with [AI_CONTEXT.md](AI_CONTEXT.md), then [FEATURE_MAP.md](FEATURE_MAP.md).** Use these maps to select a small set of source files before editing. Do not repeat a full-project scan for an ordinary feature change.
 

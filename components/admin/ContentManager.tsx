@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
+import { PermissionLink as Link } from "@/components/shared/PermissionLink";
 import { useRouter } from "next/navigation";
 import { ArrowDown, ArrowRight, ArrowUp, Eye, Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { Badge, Button, Card, PageHeading } from "@/components/ui/Primitives";

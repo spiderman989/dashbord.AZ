@@ -2,7 +2,7 @@ import type { Repository } from "@/types";
 
 const PREFIX = "azarshin.portal.v1.";
 /** The only mock persistence adapter. Replace repository methods with company API calls. */
-export function createMockRepository<T extends { id: string }>(name: string, seed: T[]): Repository<T> {
+export function createMockRepository<T extends { id: string }>(name: string, seed: T[], decode?: (value: unknown) => T[]): Repository<T> {
   const key = PREFIX + name;
   const event = `portal:${name}`;
   function read(): T[] {
@@ -11,9 +11,10 @@ export function createMockRepository<T extends { id: string }>(name: string, see
     if (!raw) return structuredClone(seed);
     try {
       const parsed: unknown = JSON.parse(raw);
+      if (decode) return decode(parsed);
       if (!Array.isArray(parsed) || !parsed.every((item: unknown) => typeof item === "object" && item !== null && "id" in item && typeof item.id === "string")) throw new Error();
       return parsed as T[];
-    } catch { throw new Error("داده‌های ذخیره‌شده قابل خواندن نیست. لطفاً با پشتیبانی تماس بگیرید."); }
+    } catch { if (decode) return decode(null); throw new Error("داده‌های ذخیره‌شده قابل خواندن نیست. لطفاً با پشتیبانی تماس بگیرید."); }
   }
   function write(items: T[]) {
     if (typeof window === "undefined") throw new Error("تغییرات نسخه نمایشی فقط در مرورگر قابل ذخیره است.");

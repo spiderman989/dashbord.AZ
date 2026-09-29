@@ -1,5 +1,50 @@
 # Validation evidence
 
+## Delete every page/link entry: 2026-09-28
+
+Fresh checks for builtin and custom deletion in `/admin/links`:
+
+- `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd run build`: PASS. Typecheck also passed after restoring the pre-existing dev type imports in `next-env.d.ts`.
+- `npm.cmd test`: PASS, all 11 domain tests.
+- `node scripts/qa-page-links.cjs`: PASS, 18 workflows and 4 axe audits on the current production build at port 3102; no browser/console errors. Covers a trash action on every row in both panels, cancel, quota failure with retry, shared-menu refresh, reload persistence, unchanged builtin grants/content/direct routes, deletion of the settings entry, empty tables and custom replacements using deleted builtin titles. An initial run stopped on an incorrect test expectation for the news heading; it was corrected to the existing UI title before the successful full rerun.
+- Final URL-direction copy adjustment: rebuilt and reran lint/typecheck, then `node scripts/qa-page-links.cjs --delete-dialog`: PASS, 1 focused workflow and 1 axe audit. Verified all 10 admin rows have deletion controls, the return URL is LTR-isolated inside the RTL confirmation, and deleting the settings entry persists while its direct route remains accessible.
+- Desktop/mobile screenshot review: PASS; existing table styling and mobile dialog layout remain usable. Final images: `test-results/page-links-delete-final-desktop.png` and `test-results/page-links-delete-final-mobile-dialog.png`.
+- `node docs/check-docs.mjs`: PASS.
+
+Evidence: `test-results/page-links-report.json` (08:57:23Z–09:01:23Z) and `test-results/page-links-delete-final-report.json` (09:03:48Z–09:03:58Z), both 2026-09-28. Deletions and quota fixtures ran only in isolated Chrome contexts. No user browser records or authoritative seed files were changed. The full general-browser and permission suites below are historical evidence and were not rerun for this scoped change.
+
+## Page and link management: 2026-09-27
+
+Fresh checks for `/admin/links` and its navigation/permission integration:
+
+- `npm.cmd run build`: PASS, including the new route (31 page wrappers plus framework not-found output).
+- `npm.cmd run lint`: PASS with no warnings; `npm.cmd run typecheck`: PASS.
+- `npm.cmd test`: PASS, 11 tests. New coverage checks full HTTP/HTTPS URLs including localhost/IP/ports, rejection of credentials/unsafe protocols, normalized title uniqueness, stable custom IDs, inactive/missing grants and the primary-admin-only section.
+- `node scripts/qa-page-links.cjs`: PASS, 15 workflows and 3 axe audits against the production build on port 3102. Covers actual-menu inventories, independent builtin overrides, external same-tab/internal new-tab navigation, no redirect chains, stable-ID creation/placement/rename, default denial and live assignment, destination authorization, disable/reactivate, dirty warnings/cancel, inline errors, quota failure without applying changes, reload/loading gate, deletion cleanup, independent reset, admin entry, protected settings and corrupt storage fallback.
+- Desktop and 360/390/768px responsive checks passed after waiting for the existing sidebar transition to settle. Desktop and mobile screenshots were visually inspected; the icon-preview ARIA role was corrected after an initial axe finding. Final audits have no violations or runtime/console errors.
+- Existing `scripts/qa-permissions.cjs`: PASS, 8 workflows and 4 axe audits against this build. Its primary-admin menu expectation now includes the fixed settings entry; the original 19 delegable builtin sections remain intact.
+- Existing `scripts/qa-browser.cjs`: PASS, all 17 workflows, 100 responsive route checks and 17 axe audits against this production build on port 3102. No browser errors, overflow, broken images or axe violations were reported.
+- `node scripts/qa-page-links.cjs --external-tab`: PASS, an additional isolated browser check follows an external subdomain/port/path URL into a new tab, verifies `noopener noreferrer` and null opener, keeps the original tab on settings, then resets that builtin to its real internal route and same-tab mode.
+- Final notification-only follow-up: `node scripts/qa-page-links.cjs --notifications`: PASS. An exact section-entry notification follows its override, a detail notification keeps its real route, and read-all leaves hidden notifications unread. This narrowed the read-all predicate after the full suites above; the final source was rebuilt, linted and typechecked successfully, then this focused scenario passed. Evidence: `test-results/page-links-notifications-report.json`.
+- `node docs/check-docs.mjs`: PASS, 31 route mappings and 14 collection mappings. `git diff --check`: PASS (line-ending notices only).
+
+Evidence: ignored `test-results/page-links-report.json`, `test-results/page-links-external-tab-report.json`, `test-results/page-links-*.png`, `test-results/permissions-report.json` and `test-results/qa-report.json`. The page-link suite ran from 12:30:28Z to 12:32:53Z on 2026-09-27. All accounts, permissions, corrupt-data and storage-failure fixtures were confined to isolated browser contexts. Source directory seeds and user browser data were not modified. The generated Next.js type imports were restored to the pre-existing dev paths after the build, and typecheck passed again. The mock settings are shared by accounts in one browser profile/origin only; an API and server authorization are still required for multi-device use and real security. Delete rollback is best effort across local collections, not a transaction.
+
+## Section permissions: 2026-09-25
+
+Fresh validation for the frontend-only permission implementation (separate from historical reports below):
+
+- `npm.cmd run lint`, `npm.cmd run typecheck`, `npm.cmd test` (8 domain tests) and `npm.cmd run build`: PASS.
+- `node scripts/qa-permissions.cjs` against the production build on localhost:3101: PASS, 8 workflows and 4 axe audits. Accounts were created only in an isolated Chrome context.
+- Danial: employee processes/CRM only, allowed landing path, hidden menus/shortcuts and blocked unauthorized nested paths; admin login rejected. Ali: admin news only, news editors preserved, other admin routes blocked, no automatic employee news access. Additional checks cover disabled admin choices, all 19 sections, bulk actions, cancel/Escape/backdrop/close, reload persistence, keyboard tabs, 360/390/768px modal sizing, live employee/admin revocation, empty states, logout, malformed grants and primary-admin immunity. A limited admin granted employee management still cannot see permission actions.
+- Final targeted shortcut check against the rebuilt app: PASS, 3 checks covering hidden external quick-process links without process access, filtered internal/unknown targets after granting process access, and primary-admin employee-panel access. Evidence: `test-results/permissions-shortcuts-report.json`.
+- Existing `scripts/qa-browser.cjs` suite: PASS, 17 workflows, 100 route/viewport checks, 17 axe audits; no overflow, broken images, console/page errors or axe violations. Its managed-login fixture now receives explicit workspace/feedback grants through the UI.
+- `node docs/check-docs.mjs`: PASS, 30 route mappings and 13 collection mappings. `git diff --check`: PASS.
+- Desktop/mobile permission-dialog screenshots were visually inspected: existing RTL styling, labeled controls, scrolling options and visible footer actions preserved.
+
+Evidence: ignored `test-results/permissions-report.json`, `test-results/permissions-desktop.png`, `test-results/permissions-mobile.png`, and `test-results/qa-report.json`. No real browser profile, authoritative directory records or existing users were modified. These tests establish local UI behavior only; server authorization remains unimplemented.
+
+
 This file records **dated evidence**, not a claim that every check was rerun during documentation work. Current commands and coverage definitions are in [DEVELOPMENT_GUIDE.md](DEVELOPMENT_GUIDE.md); current routes are in [ROUTES.md](ROUTES.md).
 
 ## Login logo replacement: 2026-09-20

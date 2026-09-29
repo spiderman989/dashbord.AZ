@@ -6,13 +6,13 @@ All working business features below are **implemented as local/demo frontend beh
 
 **Entry:** public `/login` and `/admin/login`; guarded employee/admin layouts. `LoginForm → authService → AuthGuard → PortalShell`. Local session IDs resolve into EmployeeContext; local shell state controls sidebar collapse, mobile drawer, profile, and notifications.
 
-Employees use username/password, including admin-created local accounts; admin login uses its separate built-in account. Success redirects to the panel root. The shell provides menu links, panel switching, profile and logout. Notifications use a shared repository: opening one marks it read, and “read all” replaces the collection. There is no notification delivery service or per-user notification ownership.
+Employees use username/password, including admin-created local accounts; admin login accepts the primary demo admin and managed accounts with admin entry enabled. Success targets the first allowed section or an empty panel state. The shell provides menu links, panel switching, profile and logout. Notifications use a shared repository: opening one marks it read, and “read all” replaces the collection. There is no notification delivery service or per-user notification ownership.
 
-**Change considerations:** shared form/shell changes affect both panels. Keep sessions independent; profile `department` represents account position for managed employees. Guard state does not react immediately to account/session edits. Full semantics: [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md).
+**Change considerations:** shared form/shell changes affect both panels. Keep sessions independent; profile `department` represents account position for managed employees. Guard state subscribes to account/session/permission changes and redirects revoked pages. Full semantics: [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md).
 
 ## Employee dashboard and information rail
 
-**Entry:** `/` → `Dashboard`; every employee route also includes `InfoRail`. Initial server seeds become subscribed browser data. Dashboard derives own process counts/action-required notice, active ordered quick links, own-name process activities plus shared non-process activities, two published news records, and the first active announcement.
+**Entry:** `/` → `Dashboard`; every employee route also includes `InfoRail`. Initial server seeds become subscribed browser data. Dashboard derives own process counts/action-required notice, active ordered quick links (within employee process access), own-name process activities plus shared non-process activities, two published news records, and the first active announcement. Cards, internal shortcuts, information rail and cross-section links are filtered by the same section permissions as routes.
 
 `QuickProcesses`, `ProcessStatus`, and `RecentActivities` are composed views. InfoRail uses news/gallery repositories and local time/index/modal state: actual Jalali calendar with month navigation/return to today; Tehran digital/analog clock; manually cycled published-news ticker; up to four active gallery items with modal preview. It is not a calendar event scheduler or auto-rotating news feed.
 
@@ -72,7 +72,7 @@ The employee must select exactly **پیشنهاد (`suggestion`)** or **انتق
 
 Admin searches/sorts first name, last name, clearly visible organizational position, and username. Add/edit opens a dedicated modal with Persian required-field checks. Password is never listed or prefilled; empty password on edit preserves the current value. Duplicate usernames are rejected case-insensitively. Delete requires confirmation. Changes synchronize across collection subscribers and persist locally. The saved username/password works through the existing employee login.
 
-**Change considerations:** preserve the distinction between editable EmployeeAccount and session Employee. No role selector, real user provisioning, directory linkage, or delete cascade exists. The removed bottom mock-account notice remains absent, and PortalShell omits the copyright sentence only on this exact route; other footer text remains.
+**Change considerations:** preserve the distinction between editable EmployeeAccount and session Employee. No role selector, real user provisioning, directory linkage, or delete cascade exists. The primary admin alone can open a two-tab section-permission editor from each account row; drafts save explicitly and persist by account ID. Managed accounts without grants see the no-access state. See [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md). The removed bottom mock-account notice remains absent, and PortalShell omits the copyright sentence only on this exact route; other footer text remains.
 
 ## Admin dashboard and content management
 
@@ -80,7 +80,7 @@ Admin searches/sorts first name, last name, clearly visible organizational posit
 
 Content configurations define fields, defaults, parser, columns, filters, and optional toggle/reorder behavior. News/courses edit on routes; gallery/announcements/quick links edit in modals. Preview is built from configured values; delete uses ConfirmDialog. Content logging is separate from the primary write. Quick-link reorder replaces the full ordered collection and does not log an activity.
 
-**Change considerations:** shared generic changes affect five content resources. ProcessStatus reused on the admin overview still links to employee `/processes`, which requires its own session. Admin activity history is read-only; there is no general process administration screen.
+**Change considerations:** shared generic changes affect five content resources. ProcessStatus reused on the admin overview links to employee `/processes` only when that employee-section grant is present; navigation still requires the separate employee session. Admin activity history is read-only; there is no general process administration screen.
 
 ## Gallery, announcements, and quick links
 
@@ -89,6 +89,14 @@ Content configurations define fields, defaults, parser, columns, filters, and op
 | Gallery | `/admin/gallery`, `galleryConfig`, gallery repository | InfoRail: first four active items, modal image/description/date | Image decoding/data URLs consume local quota; no gallery route or remote asset service |
 | Announcements | `/admin/announcements`, `announcementConfig`, announcement repository | `/announcements` via AnnouncementsPage; first active item on dashboard | Types are notice/important/warning/general, **separate from feedback types**; active toggles visibility, not scheduled release |
 | Quick processes | `/admin/processes`, `quickProcessConfig`, quick-process repository | Dashboard QuickProcesses; active items ordered numerically, safe link or inbox fallback | Icon/link/display configuration only; drag-and-drop/workflow modeling are absent; reorder uses up/down actions |
+
+## Page and link management
+
+**Implemented (local/demo), 2026-09-27:** primary admins use `/admin/links` to select a panel and any actual sidebar item, edit destinations/opening mode, reset a builtin destination, or create/edit/disable/delete a custom item. Builtins derive from the existing menu registry; headings and logout are excluded, and the settings entry itself has a fixed destination. The table and forms reuse the existing UI and show Persian field errors, explicit save/cancel, dirty-form warnings and deletion confirmation.
+
+**Deletion expanded 2026-09-28:** every row has a trash action, including builtin items and the fixed-destination settings entry. Confirmation removes the entry from the table, picker and shared navigation; builtin removal persists across reloads without deleting pages, content or section grants. After deleting the settings entry, the primary admin can still open `/admin/links` directly. Custom-item deletion retains its existing grant cleanup.
+
+Custom items have a fixed panel and UUID permission ID, an existing project icon with preview, a concrete same-panel page or full HTTP/HTTPS URL, and a position before another item or at the end of the panel's single menu group. The existing per-person permission editor includes them automatically. Builtins keep their original identity and grants; internal targets require destination permission too. Shared destination resolution covers sidebar links, section headings, dashboard section cards, support and exact-entry notifications/quick links, while detail/filter links retain their meaning. Local storage is shared by accounts at the same origin/browser; no page content, backend, subdomain or SSO is created.
 
 ## Activities
 

@@ -43,6 +43,7 @@ Both dev and start bind to `0.0.0.0`. A different port is supported by forwardin
 | `npm run lint` | `eslint .` with Next core-web-vitals/TypeScript configs |
 | `npm run typecheck` | `tsc --noEmit`; tests are excluded in tsconfig |
 | `npm test` | Node strip-types test runner on `tests/domain.test.ts` |
+| `node scripts/qa-permissions.cjs` | Isolated permission UI/login/route/revocation scenarios; default `http://localhost:3101`, optional PORTAL_TEST_URL |
 | `npm run test:e2e` | `node scripts/qa-browser.cjs`; requires a running server and installed Chrome |
 | `node scripts/check-source.mjs` | Syntax transpilation for app TS/TSX and strict domain checking; supplements full typecheck |
 | `node scripts/setup-assets.mjs` | Recopy local font/license if necessary |
@@ -75,9 +76,13 @@ Current harness coverage: 17 named workflows; all 28 concrete page examples at 1
 
 The harness writes JSON reports/screenshots under ignored `test-results/`. Optional inspection mode is supported: `node scripts/qa-browser.cjs --inspect /admin/employees 390`. It seeds local demo session markers only in the isolated context and writes inspection diagnostics instead of running the full suite. Dated results are in [VALIDATION.md](VALIDATION.md); results must not be presented as newly run unless actually rerun.
 
-The four [domain tests](../tests/domain.test.ts) cover exact directory records/order/duplicates, Persian/Arabic search/digits, actual Jalali leap/year/month boundaries, and local/HTTPS link acceptance with unsafe schemes rejected. There are no isolated unit tests for every service; browser workflows cover many service behaviors.
+The eleven [domain tests](../tests/domain.test.ts) cover exact directory records, Persian search/digits, Jalali boundaries, existing link safety, panel/route authorization, full HTTP/HTTPS destination validation, normalized title uniqueness and stable custom-section grants. The permission browser suite creates isolated accounts and checks drafts, bulk actions, refresh, live revocation, limited admins, unknown paths and mobile dialogs. The page-link suite covers dynamic menus and destination/grant interaction. Browser workflows exercise the service boundaries.
 
 ## Configuration and environment
+
+Page/link checks (2026-09-27): `node scripts/qa-page-links.cjs` runs the feature scenarios in an isolated Chrome context against a current production build; default URL is `http://127.0.0.1:3102` and `PORTAL_TEST_URL` can override it. It writes `test-results/page-links-report.json` and desktop/mobile screenshots, tests storage failures/corrupt data only in its own browser context, and audits the manager's table/editor/modal with axe. `npm test` now has 11 domain tests, including HTTP/HTTPS/title validation and custom section IDs. The permission suite expects 10 primary-admin menu items, while only 9 builtin admin sections remain delegable.
+
+The 2026-09-28 page-link checks additionally cover deletion on every row in both panels, builtin cancellation and failed-write retry, live navigation refresh, persistence, retained content/grants/direct routes, mobile deletion-dialog accessibility, deleting the settings entry itself, empty inventories and a custom replacement reusing a deleted builtin title. The focused `node scripts/qa-page-links.cjs --delete-dialog` check verifies the final controls, LTR-isolated return URL in the RTL confirmation, mobile accessibility and direct access after deleting the settings entry.
 
 No application environment variables or secrets are read in the audited source. No environment file/example is supplied. [next.config.ts](../next.config.ts) enables strict React mode, disables the powered-by header, and has no remote-image patterns. Root layout forces dynamic rendering; no static export is configured. [tsconfig.json](../tsconfig.json) defines root `@/` imports, strict ES2022/bundler checking, and generated Next type includes. [eslint.config.mjs](../eslint.config.mjs) ignores build/test/tool output. [postcss.config.mjs](../postcss.config.mjs) enables Tailwind's PostCSS plugin.
 
@@ -93,7 +98,7 @@ Next generates [next-env.d.ts](../next-env.d.ts) and `.next` route type files; d
 | Seed edit seems ineffective | Existing collection JSON wins over seeds. Inspect the relevant key in a test profile; do not wipe a user's records |
 | Saved data unreadable | Adapter rejects malformed JSON/invalid record IDs; there is no repair/migration UI |
 | Image save fails | Check file decode/type/size and available localStorage quota; no remote upload service exists |
-| Employee change not reflected in profile/session | Reload/remount AuthGuard; collection updates alone do not refresh EmployeeContext |
+| Employee change not reflected in profile/session | Check account/session/permission subscriptions in AuthGuard; these now refresh the mounted identity and grants |
 | Wrong “latest” entry/order | Repository arrays preserve seed order and prepend creates; most lists do not date-sort automatically |
 
 During this audit `npm.cmd ls --depth=0` succeeded but listed extra installed native/WASM support packages as `extraneous`. No dependency cleanup or upgrade was performed; use the lockfile to reconstruct an environment rather than assuming every current node_modules entry is a project dependency.

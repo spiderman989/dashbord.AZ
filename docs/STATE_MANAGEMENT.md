@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | Persistent domain collections | [createMockRepository](../services/mockRepository.ts) via module-level service instances | Services mutate arrays; feature components read through `useResource` |
 | Resource view state | [useResource](../hooks/useResource.ts): `data`, `loading`, `error`, `reload` | One state instance per mounted consumer, synchronized by repository events |
-| Current identity | [AuthGuard](../components/shared/AuthGuard.tsx) private EmployeeContext | `useEmployee()` below guarded layouts; loaded by authService |
+| Current identity and grants | [AuthGuard](../components/shared/AuthGuard.tsx), EmployeeContext and [AccessContext/useAccess](../hooks/useAccess.ts) | Resolves authService + permissionService before content; subscribed refresh with stale-request protection |
 | Session markers | [authService](../services/authService.ts) | Two independent localStorage keys, described in [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md) |
 | Toast | [ToastProvider](../components/ui/Toast.tsx) at root | `useToast()`; one success/error message, replaced by the next, dismissed after 4.5 seconds |
 | Search/filter/sort/page | DataTable and individual feature components | React `useState`; generally resets on component remount, not persisted |
@@ -33,6 +33,8 @@ Every collection uses the exact prefix `azarshin.portal.v1.` plus the suffix bel
 | `tickets` | `ticketService` — [ticketService.ts](../services/ticketService.ts) | Empty array |
 | `employees` | `employeeService` — [employeeService.ts](../services/employeeService.ts) | Empty array; built-in demo identity is separate |
 | `feedback` | `feedbackService` — [feedbackService.ts](../services/feedbackService.ts) | Empty array |
+| `permissions` | `permissionService` — [permissionService.ts](../services/permissionService.ts) | Empty array; IDs are stable account IDs, no managed default grants |
+| `page-links` | `pageLinksService` — [pageLinksService.ts](../services/pageLinksService.ts) | Empty array; builtin overrides and UUID custom items shared by all accounts |
 
 Session keys are **not** collection keys: `azarshin.demo.employee` and `azarshin.demo.admin` contain a plain identity ID, not a JSON collection.
 
@@ -49,8 +51,14 @@ Passing stable service instances matters: constructing a repository in a compone
 
 ## Consistency and persistence limits
 
+Page-link settings (2026-09-27) use the existing repository with an optional decoder that validates every field on read. Invalid builtin overrides fall back to the menu definition; invalid custom records are omitted from executable entries. Invalid JSON falls back to an empty configuration without writing or clearing storage. Storage access failures remain errors. AuthGuard subscribes separately to these settings and ignores stale reads; `linksReady` gates all configured links until the first read or refresh completes, without remounting the active editor on every settings change. Drafts remain component state until explicit save. The manager warns before changing panel/item, closing dirty forms or leaving the page.
+
+Deleting a custom item removes only its ID from the existing permission records, then removes the menu record. If that second write fails, the service attempts to restore the permission snapshot and reports failure; this is not a cross-tab transaction. Numeric menu positions contain no references to deleted items. Disabling keeps the complete record and grants. The existing last-write-wins limitation remains. Settings and grants are shared within one browser profile and origin; an API is required to share them between devices.
+
+As of 2026-09-28, deleting any builtin menu entry, including `admin.links`, persists a validated `deleted: true` override in the same collection. Menu derivation omits it from the manager, selector and shared links, so static definitions do not restore it on reload. Page routes, content and builtin grants stay intact. Existing overrides without the optional flag remain compatible; failed writes leave the current entry usable. All entry links wait for loaded settings, including the fixed-destination settings entry.
+
 All local records persist across reloads and logout until changed or browser storage is removed. They are shared by accounts using the same origin/browser profile, even if the UI filters ownership. They are not encrypted, synchronized across devices, transactionally updated, or backed up by this application.
 
 Repositories read the latest array when mutating but replace the whole array; concurrent read/modify/write operations can lose updates. No automatic migration, referential integrity, delete cascade, conflict resolution, undo, or reset UI exists. Changing a seed file does not override an already stored collection. Do not clear storage to “fix” a feature without considering the user's local records; use isolated test contexts for validation.
 
-AuthGuard does **not** subscribe to session or employee repository changes. A mounted identity may remain stale until a reload/remount, even though the employee list refreshes across tabs. Activity filtering uses `user === employee.name` for process activities; a name change can hide old process activity entries. Other non-process activities and notifications are shared. See [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md) for the exact visibility rules.
+AuthGuard now subscribes to the session event, native session storage changes, employee repository and permission repository. It reloads identity/grants, gates content while refreshing, and redirects revoked pages to an allowed destination or the empty panel root. PermissionEditor owns an unsaved local draft; closing never writes it. Activity filtering uses `user === employee.name` for process activities; a name change can hide old process activity entries. Other non-process activities and notifications are shared. See [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md) for the exact visibility rules.

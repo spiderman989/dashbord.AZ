@@ -16,9 +16,11 @@ RootLayout / ToastProvider
 
 Layout sources: [employee layout](<../app/(employee)/layout.tsx>), [admin layout](<../app/admin/(panel)/layout.tsx>). Both use the same [AuthGuard](../components/shared/AuthGuard.tsx) and [PortalShell](../components/shared/PortalShell.tsx); only the employee group supplies the information rail. Shared CSS and UI primitives establish both panels' appearance.
 
-There is no domain backend in this repository. Server components read seed data because the repository adapter cannot access browser storage on the server. The client guard resolves an identity after mount before rendering its children. Initial service calls in server wrappers are therefore **not server-side authorization**.
+There is no domain backend in this repository. Server components read seed data because the repository adapter cannot access browser storage on the server. The client guard resolves identity and section permissions after mount before rendering protected children. PortalShell contains SectionGuard; the central route registry also drives filtered menus and internal links. Initial service calls in server wrappers are therefore **not server-side authorization**.
 
 ## Data and communication
+
+As of 2026-09-27 the existing AccessContext also supplies a separately subscribed page-link snapshot. `useAccess` resolves exact menu/section entries from the real navigation definitions plus validated local overrides/custom items. PermissionLink/MenuLink choose Next Link for internal routes and browser anchors for external URLs, gate readiness, and check both source and destination grants. Detail and query links remain direct. The manager uses the existing repository adapter (with a page-links-only decoder), form drafts, dialogs and table patterns; no new state dependency, backend or page-generation architecture is involved.
 
 ```mermaid
 flowchart TD
@@ -36,7 +38,7 @@ flowchart TD
 
 [Repository<T>](../types/index.ts) standardizes async list/get/create/update/remove/replace and subscription methods. Services create stable module-level repository instances. [useResource](../hooks/useResource.ts) owns each consumer's data/loading/error state; there is no centralized application store or external query cache. Browser writes dispatch an in-tab event, and other same-origin tabs receive native storage events. See [STATE_MANAGEMENT.md](STATE_MANAGEMENT.md) for exact lifecycle and keys.
 
-Components do not import seed arrays directly. Pages use service aliases such as `getNews`; client features call repository methods and optional domain helpers. `useEmployee` supplies identity, `useToast` supplies transient messages, and `next/link`/`next/navigation` supply navigation. Filters, pagination, form drafts, and modal visibility belong to the component that renders them.
+Components do not import seed arrays directly. Pages use service aliases such as `getNews`; client features call repository methods and optional domain helpers. `useEmployee` supplies identity, [useAccess](../hooks/useAccess.ts) supplies section/route checks, `useToast` supplies transient messages, and `next/link`/`next/navigation` supply navigation. Filters, pagination, form drafts, and modal visibility belong to the component that renders them.
 
 ## Existing implementation patterns
 
@@ -67,6 +69,6 @@ Full file-level edges are in [FEATURE_MAP.md](FEATURE_MAP.md).
 
 Repository operations have no network calls, permissions, schema migrations, transactions, or conflict resolution. Entire arrays are replaced on write, so concurrent tab writes can overwrite each other. Runtime storage checks validate only array entries' string IDs, not full models.
 
-Creating a process awaits the activity write after the process has already been saved: an activity failure can leave a successful process with an error UI. Content edits and course enrollment log activity separately with a warning on failure. Deleting employees does not cascade to their data or immediately refresh a mounted guard. Deleting courses does not remove enrollment processes. These are current behaviors, not guarantees of transactional consistency.
+Creating a process awaits the activity write after the process has already been saved: an activity failure can leave a successful process with an error UI. Content edits and course enrollment log activity separately with a warning on failure. Deleting employees does not cascade to their data; subscribed guards now resolve the missing identity and redirect to login. Deleting courses does not remove enrollment processes. These are current behaviors, not guarantees of transactional consistency.
 
 `ResourceConfig.viewHref` exists and news supplies it, but `ContentManager` does not consume it. Several async `get*` aliases are available without being used by current pages. Preserve contracts unless the requested change makes their removal necessary. Real integration contracts are **NOT CURRENTLY IMPLEMENTED**; comments about future API replacement do not define endpoints.

@@ -1,58 +1,72 @@
 # Authentication and permissions
 
-All authentication here is **local/demo UI behavior**. There are no session cookies, tokens, server checks, password hashes, session expiry, credential recovery, or real access control. Credentials and session markers can be inspected/changed in browser storage. Do not describe client filtering as secure isolation.
+Updated **2026-09-25** for section permissions. All authentication and authorization here are **local/demo UI behavior**. Browser storage, client code and client checks can be changed by the browser user. There are no secure cookies, tokens, password hashes, server permission checks, or production isolation.
 
-## Entry points and identities
+## Identities and independent sessions
 
-| Login | Form / service | Built-in credentials | Success destination |
+| Login | Built-in credentials | Managed accounts | Success destination |
 | --- | --- | --- | --- |
-| `/login` | `LoginForm` → `loginEmployee` | `employee` / `employee123` | `/` |
-| `/admin/login` | `LoginForm admin` → `loginAdmin` | `admin` / `admin123` | `/admin` |
+| `/login` | `employee` / `employee123`; primary admin also accepted | Existing local username/password | First allowed employee section, or employee root empty state |
+| `/admin/login` | `admin` / `admin123` | Same local credentials, only with explicit admin entry enabled | First allowed admin section, or admin root empty state |
 
-Sources: [LoginForm.tsx](../components/shared/LoginForm.tsx), [authService.ts](../services/authService.ts), [data/employees.ts](../data/employees.ts). Both forms start with empty fields and provide a password-visibility control. Demo credential panels and sample-fill controls are absent from both login pages. Both fields are named **نام کاربری** and **رمز عبور**. Personnel-code/national-ID login is no longer the current implementation; `personnelCode` remains in the identity type for compatibility.
+Sources: [LoginForm](../components/shared/LoginForm.tsx), [authService](../services/authService.ts), [demo identities](../data/employees.ts).
 
-Local employees created through `/admin/employees` can sign in on `/login` at the same browser origin. The management list starts empty; it does not edit the built-in demo employee or admin. Account creation does not provision admin roles.
+The supplied primary admin has the existing `SUPER_ADMIN` role and stable ID `admin-1`. It is separate from editable EmployeeAccount records and is never listed in employee CRUD or the permission editor. Its full access to all registered sections is derived from the role, regardless of stored grants. Unknown routes remain denied even for this role.
 
-## Employee login flow
+Managed identities project the account's stable ID, username, joined first/last name and position into Employee; position maps to the existing department profile field. Employee sessions project role EMPLOYEE; managed admin sessions project ADMIN. ADMIN does not bypass section permissions or grant permission-management rights. Editable account data cannot provision SUPER_ADMIN.
 
-1. Trim/lowercase username; require 3–40 ASCII letters/digits/`.`/`_`/`-`, starting with a letter or digit.
-2. Require a nonblank password, trimmed length at least 6 and original length no greater than 80. Trimming is used for validation only.
-3. After a simulated 450ms delay, find a case-insensitive username match in `employeeService.list()`.
-4. If a local match exists, compare the password **exactly**, including case, whitespace, and Persian/Arabic/ASCII digit forms. A wrong password on that match does not fall through to the demo account.
-5. With no matching local record, accept only the built-in employee credentials.
-6. Write the resulting ID to `azarshin.demo.employee`; return an `Employee` identity and navigate to `/`.
+Session keys remain independent: `azarshin.demo.employee` and `azarshin.demo.admin`. Signing in or out of one panel does not create, change, or remove the other panel's session. A panel switch targets the first section allowed for the current identity; the destination still resolves its own independent session. A missing destination session redirects to that panel's login. Shared demo sessions in one browser origin must not be interpreted as production multi-user security.
 
-The employee login form uses text input mode, username autocomplete, current-password autocomplete, and explicit Persian validation. It does not normalize passwords or accept a ten-digit national-ID contract. Admin login remains separate: trim the username and compare case-sensitively to `admin`, compare the password exactly to `admin123`, then write `admin-1` to `azarshin.demo.admin`.
+## Credentials and identity resolution
 
-`getCurrentEmployee()` resolves the stored ID on guard mount: the built-in ID resolves to demo data; other IDs are looked up in the current local account collection. Its account projection retains `id` and `username`, joins first/last name into `name`, maps `position` to the existing `department` profile field, sets `personnelCode` to empty, and always sets role `EMPLOYEE`. Password is not returned in this context. This compatibility mapping does not link the account to the directory's departments.
+Both forms start empty with username/password labels and visibility controls. No demo credential panels or autofill buttons are displayed.
 
-`getCurrentAdmin()` accepts only the built-in admin ID. Both session getters return null server-side. See [API_AND_DATA.md](API_AND_DATA.md) for account-save validation, duplicate usernames, and the reserved demo username rule.
+Usernames are trimmed and case-insensitive, 3–40 ASCII letters/digits/dot/underscore/hyphen, starting alphanumeric. Passwords must have trimmed length at least 6 and original length at most 80; comparison preserves exact spaces, case and digit forms. Validation never normalizes a password.
 
-## Guards and capabilities
+After the existing simulated delay, explicit primary-admin credentials resolve the primary identity. Otherwise, a matching managed username must match its password exactly; a wrong password never falls through to a demo account. With no local match, the employee form can use the built-in employee credentials. The admin form additionally loads permissions and rejects disabled admin entry before writing its session marker.
 
-[AuthGuard.tsx](../components/shared/AuthGuard.tsx) loads the current identity in a client effect. While waiting it renders LoadingState. Missing identity redirects with `router.replace` to the relevant login. Service errors render ErrorState. The admin mode additionally accepts only `ADMIN`, `SUPER_ADMIN`, `CONTENT_MANAGER`, or `HR`.
+Both session getters resolve current stored account IDs. Deleted or missing accounts no longer resolve. Primary-admin IDs resolve only to the explicit demo identity; managed account fields are never trusted as a role. Account-save validation reserves both built-in usernames for new/renamed accounts while retaining legacy unchanged usernames; see [API_AND_DATA.md](API_AND_DATA.md).
 
-Only demo `ADMIN` and employee identities are currently supplied by the services. There are no separate HR/content-manager screens, role editors, per-action checks, or permission hierarchy. Every admitted admin uses the same admin navigation and capabilities.
+## Central section contract
 
-| Data/action | Current UI visibility or capability |
-| --- | --- |
-| Processes/details | Employee components filter `employeeId === current.id`; detail also checks requested record ID |
-| Course enrollment | Employee ID + course reference marks a previously submitted request |
-| Tickets / feedback | Submit with current employee ID; show only records with that ID |
-| News | Employees see only published records; admins manage all statuses |
-| Courses | Employees see active and finished; request action only for active courses; admins manage all statuses |
-| Announcements / gallery / quick links | Employee views filter `active`; admin content views include all |
-| Directory | Employees see active extensions; admin manages all departments/extensions |
-| Accounts | Admin CRUD through its guarded page; account repository itself has no permission checks |
-| Activities | Admin sees all; employees see own-name process activities **and all non-process activities** |
-| Notifications | Shared records/read flags across identities and panels; no owner scoping |
+[lib/permissions.ts](../lib/permissions.ts) defines stable, non-Persian IDs, labels, panel membership, menu membership, default landing order and an explicit route allowlist. Employee and admin IDs are independent, including news, courses, processes, announcements and activities.
 
-All repositories expose all records to any caller. Public client bundles and localStorage are not confidential. An employee account does not inherit an admin session; an admin session does not automatically create an employee session. Panel-switch and admin support links can lead to an employee login if that independent session is absent.
+There are **10 builtin employee sections and 10 builtin admin sections**, including primary-admin-only `admin.links` (2026-09-27). The permission editor offers the original 10/9 delegable sections plus custom menu items in the matching panel. Activities and announcements are included even though the original employee sidebar does not list them. Employee gallery previews have no separate page and belong to the workspace permission; calendar/clock remain shared shell utilities. Existing sidebar order is preserved.
 
-## Updates, deletion, and logout
+Routes match exact registered patterns and single-segment dynamic IDs. Neither root matches every descendant. Similar prefixes, unregistered nested routes, and unknown sections fail closed. Two catch-all page wrappers ensure unknown URLs reach the same guard; they grant no section. See [ROUTES.md](ROUTES.md).
 
-Editing username/password keeps a stable account ID, so existing local feedback/tickets/processes remain associated. Changing a password does not revoke sessions. Account deletion prevents later login and causes the next guard reload/remount to redirect; it does not immediately invalidate an already mounted EmployeeContext, remove the stale session key, or delete dependent records.
+`UserPermissions` contains account ID, employee section IDs, admin entry flag and admin section IDs. No operation-level permissions exist. Allowing a section preserves its current create/edit/delete/publish/enrollment behavior. Disabling admin entry blocks every admin section even if its section selections are retained.
 
-AuthGuard has no storage-event subscription, so logout in another tab is not an immediate cross-tab guard refresh. Each logout function removes only its own session key; PortalShell then redirects to its own login. Collections and the other panel's session remain intact.
+Managed accounts without a permission record have no grants. Existing user records are not overwritten or seeded with named examples. The supplied demo employee retains the existing employee sections by default. The primary admin always has all registered sections.
 
-Real authentication, server-enforced permissions, multi-user privacy, and external SSO are **NOT CURRENTLY IMPLEMENTED**. Any future authorized security integration must inspect the server boundary and replace these local assumptions explicitly; the current source defines no production identity/API contract.
+## Editing and persistence
+
+[AdminEmployees](../components/admin/AdminEmployees.tsx) displays the named shield action only to the primary admin. [PermissionEditor](../components/admin/PermissionEditor.tsx) reuses Modal, Button, states and toast. It loads saved permissions into an isolated draft, has two keyboard-operable tabs, panel-scoped select/clear actions, disabled admin choices without entry, responsive scrolling and fixed form actions. Cancel, Escape, backdrop and close discard the draft. Successful save displays a Persian toast.
+
+[permissionService](../services/permissionService.ts) exposes `getForUser`, `saveForUser`, `removeCustomSection` and `subscribe`. Its private repository uses `azarshin.portal.v1.permissions`; each record's ID is the user's stable account ID. Save rechecks the current admin session for SUPER_ADMIN, rejects the primary-admin target and missing accounts, validates the record, then persists and notifies. Reads validate field shapes and panel-scoped IDs; a syntactically valid custom ID grants nothing unless its active item still exists. Saves prune missing custom IDs. This is a mock service boundary, not protection against browser tampering.
+
+## Guards and UI consumers
+
+Custom menu items share `UserPermissions` and section-level grants; they have no operation-level permissions. A new custom ID is allowed for the primary admin and denied for every other account (including the supplied demo employee) until assigned. Title, URL, icon, order and active edits retain the ID and grants. Inactive items remain marked in the permission editor but are hidden from usable menu/shortcut entries. Unknown, deleted or malformed custom entries do not grant access, even if an ID remains in an old draft. Saving permissions prunes deleted custom IDs; item deletion cleans that ID from stored grants only.
+
+Builtin menu entries can also be deleted (2026-09-28). This removes their navigation entries and exact-entry links while preserving the underlying section grants and direct route access. It does not revoke a user's access to the page. Removing `admin.links` from the menu preserves its SUPER_ADMIN-only direct route.
+
+`useAccess.resolveItem/resolveHref` require the source item's section, active status and ready settings. Internal destinations additionally require the destination page's existing section grant. An absolute same-origin HTTP/HTTPS link is also checked against the route allowlist. No link can grant admin entry or bypass `admin.links`, which remains restricted to SUPER_ADMIN even with a forged section selection. External-system authorization belongs to that system. Frontend controls here only govern portal navigation. A user with custom links but no builtin pages receives a usable link landing view in the existing panel root.
+
+[AuthGuard](../components/shared/AuthGuard.tsx) resolves identity and permissions before protected content mounts. It subscribes to session, account and permission changes, ignores stale async results, and hides protected content during refresh. Read failures show a Persian error with retry/logout. Account deletion and cross-tab logout refresh the mounted guard.
+
+[useAccess](../hooks/useAccess.ts) exposes section/path checks, first allowed destination and primary-admin management capability. [SectionGuard](../components/shared/SectionGuard.tsx) inside the shell gates page children on every navigation. Direct denied URLs display «شما به این بخش دسترسی ندارید». A panel without any allowed sections displays «برای حساب شما دسترسی تعیین نشده است؛ با مدیر سامانه تماس بگیرید» with logout and no redirect loop.
+
+Initial login targets an allowed section. Opening a panel root without dashboard access targets its first allowed section. When saved grants remove access to a mounted page, the guard replaces that URL with the first allowed page or the panel's empty root.
+
+[PortalShell](../components/shared/PortalShell.tsx) filters desktop/mobile navigation, support links, panel switches and notifications. [PermissionLink / MenuLink / SectionAccess](../components/shared/PermissionLink.tsx) and useAccess gate dashboard cards, quick links, news ticker, activity/announcement previews, CRM support, and configured course/task links. Same-origin HTTP/HTTPS links are checked as internal paths; external destinations use browser anchors with safe new-tab attributes. Exact-entry notifications follow configured destinations; hidden notification links are excluded from counts and “read all”.
+
+## Existing data visibility and limits
+
+Section permissions do not change ownership contracts: processes/tickets/feedback filter employee IDs; process activities use display names, other activities remain shared; notifications/read flags are shared. Published/active filters and exact directory records remain unchanged. All local repositories are browser-readable, so these filters do not establish privacy.
+
+Account edits preserve IDs and associated records. Password changes do not revoke sessions. Deletion does not cascade data or permission records; missing accounts cannot log in and new accounts receive different IDs. Local collection writes still lack transactions and conflict resolution.
+
+## Future backend connection
+
+Replace permissionService reads/writes/subscriptions with an authenticated permission API, and replace authService's mock identity/session resolution with trusted server identities. The server must determine the primary-admin role and validate permission changes, target identities, panel entry, section access and data ownership on **every API request**. Client menus/guards remain UX controls. No backend, endpoint, database, SSO, or real authentication was added.

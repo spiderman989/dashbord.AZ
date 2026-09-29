@@ -1,14 +1,14 @@
 # Routes
 
-The current tree has **28 page routes**. Parenthesized App Router groups do not appear in the URL. All file links below point to the actual page wrapper; component implementation paths are indexed in [COMPONENTS.md](COMPONENTS.md) and [FEATURE_MAP.md](FEATURE_MAP.md).
+The current tree has **31 page routes**: 29 feature/login wrappers plus two denying catch-all wrappers. Parenthesized App Router groups do not appear in the URL. All file links below point to the actual page wrapper; component implementation paths are indexed in [COMPONENTS.md](COMPONENTS.md) and [FEATURE_MAP.md](FEATURE_MAP.md).
 
 Access keys:
 
 - **Public:** no AuthGuard. An existing local session does not automatically redirect away from the login page.
 - **Employee:** [employee layout](<../app/(employee)/layout.tsx>) → `AuthGuard` → employee `PortalShell` plus `InfoRail`; requires the employee session or redirects client-side to `/login`.
-- **Admin:** [admin layout](<../app/admin/(panel)/layout.tsx>) → `AuthGuard admin` → admin `PortalShell`; requires the independent admin identity and common admin-role check or redirects client-side to `/admin/login`.
+- **Admin:** [admin layout](<../app/admin/(panel)/layout.tsx>) → `AuthGuard admin` → admin `PortalShell`; requires an independent admin identity or redirects client-side to `/admin/login`; every registered section additionally requires its grant and enabled admin entry.
 
-These are UI requirements, not server access controls; see [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md). Every employee page additionally consumes news/gallery through InfoRail, and both shells consume notifications.
+These are UI requirements, not server access controls; see [AUTH_AND_PERMISSIONS.md](AUTH_AND_PERMISSIONS.md). SectionGuard inside each shell checks the explicit allowlist in [permissions.ts](../lib/permissions.ts). Unknown paths deny by default. InfoRail news follows employee news access; its gallery belongs to workspace access. Both shells filter notification targets.
 
 ## Complete catalog
 
@@ -41,7 +41,10 @@ These are UI requirements, not server access controls; see [AUTH_AND_PERMISSIONS
 | `/admin/processes` | [page.tsx](<../app/admin/(panel)/processes/page.tsx>) | Admin | `ContentManager kind="processes"` | **Quick-process links**, modal CRUD/toggle/reorder | فرآیندها |
 | `/admin/activities` | [page.tsx](<../app/admin/(panel)/activities/page.tsx>) | Admin | `ActivityHistory admin` | All activity records; read-only | فعالیت‌ها; admin recent activities |
 | `/admin/phone-directory` | [page.tsx](<../app/admin/(panel)/phone-directory/page.tsx>) | Admin | `AdminPhoneDirectory` | Departments and nested extensions | شماره‌های داخلی; admin dashboard |
-| `/admin/employees` | [page.tsx](<../app/admin/(panel)/employees/page.tsx>) | Admin | `AdminEmployees` | Local accounts; modal CRUD | مدیریت کارکنان |
+| `/admin/employees` | [page.tsx](<../app/admin/(panel)/employees/page.tsx>) | Admin | `AdminEmployees` | Local account CRUD; primary-admin-only permissions dialog | مدیریت کارکنان |
+| `/admin/links` | [page.tsx](<../app/admin/(panel)/links/page.tsx>) | Primary admin only | `PageLinksManager` | Destination overrides and custom menu items in both panels | مدیریت صفحات و لینک‌ها; immutable destination |
+| `/[...unmatched]` | [page.tsx](<../app/(employee)/[...unmatched]/page.tsx>) | Employee | `UnknownEmployeePage` | Null wrapper; SectionGuard denies unknown paths | None |
+| `/admin/[...unmatched]` | [page.tsx](<../app/admin/(panel)/[...unmatched]/page.tsx>) | Admin | `UnknownAdminPage` | Null wrapper; SectionGuard denies unknown paths | None |
 
 ## Parameters and navigation conventions
 
@@ -49,8 +52,10 @@ Dynamic `params` and page `searchParams` are awaited promises. `[id]` is a route
 
 `/processes?status=action_required` initializes the table's local status filter. Supported status values come from `processLabels`; the URL is not kept synchronized as filters change. `/processes/new?type=leave` (also `mission`, `equipment`, `purchase`) initializes the request form; default is `leave`. Other feature filters and dialogs do not introduce URLs.
 
-[lib/navigation.ts](../lib/navigation.ts) defines ordered sidebar items. Employee order: `/`, `/processes`, `/crm`, `/phone-directory`, `/tickets`, `/news`, `/courses`, `/feedback`. Admin order: `/admin`, `/admin/news`, `/admin/courses`, `/admin/gallery`, `/admin/announcements`, `/admin/processes`, `/admin/activities`, `/admin/phone-directory`, `/admin/employees`. Preserve order unless the task requests otherwise. PortalShell marks roots by exact equality and other items by pathname prefix; the same menu is used in the mobile drawer.
+[lib/navigation.ts](../lib/navigation.ts) derives ordered sidebar items from [lib/permissions.ts](../lib/permissions.ts); grants filter both desktop and mobile menus. Employee order: `/`, `/processes`, `/crm`, `/phone-directory`, `/tickets`, `/news`, `/courses`, `/feedback`. Admin order: `/admin`, `/admin/news`, `/admin/courses`, `/admin/gallery`, `/admin/announcements`, `/admin/processes`, `/admin/activities`, `/admin/phone-directory`, `/admin/employees`. Preserve order unless the task requests otherwise. PortalShell marks roots by exact equality and other items by exact path or slash-delimited descendant; the same menu is used in the mobile drawer.
 
 ## Layout and boundary files (not routes)
 
-[app/layout.tsx](../app/layout.tsx) wraps everything. [app/not-found.tsx](../app/not-found.tsx) handles unmatched URLs and links home. [Employee loading](<../app/(employee)/loading.tsx>) uses LoadingState; [employee error](<../app/(employee)/error.tsx>) provides a Persian error and reset. [Admin loading](<../app/admin/(panel)/loading.tsx>) and [admin error](<../app/admin/(panel)/error.tsx>) re-export those boundaries. No business API routes or middleware are present.
+As of 2026-09-27, the original sidebar order remains intact and `/admin/links` is appended to the admin menu. [pageLinks.ts](../lib/pageLinks.ts) merges destination overrides and positioned custom items into those real menu definitions. Internal targets are concrete existing routes in the same panel; record-dependent paths are not offered. Custom items create no new routes. Exact section-entry shortcuts use the same destination resolver as the sidebar; query, hash and detail links keep their explicit URLs. Panel switching remains an independent-session operation.
+
+[app/layout.tsx](../app/layout.tsx) wraps everything. [app/not-found.tsx](../app/not-found.tsx) remains the framework not-found boundary; protected unknown URLs are captured by the denying wrappers above. [Employee loading](<../app/(employee)/loading.tsx>) uses LoadingState; [employee error](<../app/(employee)/error.tsx>) provides a Persian error and reset. [Admin loading](<../app/admin/(panel)/loading.tsx>) and [admin error](<../app/admin/(panel)/error.tsx>) re-export those boundaries. No business API routes or middleware are present.

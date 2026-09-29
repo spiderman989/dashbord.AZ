@@ -55,3 +55,64 @@ test("future case links allow local and HTTPS URLs and reject executable schemes
   assert.equal(safeHref("data:text/html,test"), undefined);
   assert.equal(safeHref("http://insecure.example.test"), undefined);
 });
+
+import { canAccessPath, canAccessSection, emptyPermissions, firstAllowedPath, sectionForPath, sections, type UserPermissions } from "../lib/permissions.ts";
+import type { Employee } from "../types/index.ts";
+
+const limited: Employee = { id: "qa-user", name: "Test", personnelCode: "", department: "", role: "EMPLOYEE" };
+test("section permissions keep panels independent and require explicit admin entry", () => {
+  const permissions: UserPermissions = { id: limited.id, employeeSections: ["employee.processes", "employee.crm"], adminAccess: false, adminSections: ["admin.news"] };
+  assert.equal(canAccessPath(limited, permissions, "/processes/new?type=leave"), true);
+  assert.equal(canAccessPath(limited, permissions, "/news/news-1"), false);
+  assert.equal(canAccessPath(limited, permissions, "/admin/news/new"), false);
+  permissions.adminAccess = true;
+  assert.equal(canAccessPath(limited, permissions, "/admin/news/news-1"), true);
+  assert.equal(canAccessPath(limited, permissions, "/news/news-1"), false);
+  assert.equal(canAccessPath(limited, permissions, "/admin/courses/new"), false);
+});
+test("unknown routes fail closed, including nested paths and similar prefixes", () => {
+  const superAdmin: Employee = { ...limited, role: "SUPER_ADMIN" };
+  const permissions = emptyPermissions(superAdmin.id);
+  for (const path of ["/future", "/admin/future", "/admin/news/item/extra", "/newsroom", "/processes-extra", "/admin/news/../employees", "//evil.test/news", "/news/%2e%2e", "/news/%ZZ"]) {
+    assert.equal(canAccessPath(superAdmin, permissions, path), false, path);
+  }
+  assert.equal(sectionForPath("/admin/news/news-1/?preview=yes#title")?.id, "admin.news");
+  assert.equal(sectionForPath("/news/news-1")?.id, "employee.news");
+});
+test("landing destinations never depend on access to a dashboard", () => {
+  const permissions: UserPermissions = { ...emptyPermissions(limited.id), employeeSections: ["employee.crm", "employee.processes"], adminAccess: true, adminSections: ["admin.news"] };
+  assert.equal(firstAllowedPath(limited, permissions, "employee"), "/processes");
+  assert.equal(firstAllowedPath(limited, permissions, "admin"), "/admin/news");
+  assert.equal(firstAllowedPath(limited, emptyPermissions(limited.id), "employee"), null);
+  assert.equal(firstAllowedPath(limited, emptyPermissions(limited.id), "admin"), null);
+});
+test("primary admin retains all known sections but another user's record grants nothing", () => {
+  const primary: Employee = { ...limited, role: "SUPER_ADMIN" };
+  for (const section of sections) assert.equal(canAccessSection(primary, emptyPermissions(primary.id), section.id), true);
+  assert.equal(canAccessPath(limited, { ...emptyPermissions("another-user"), employeeSections: ["employee.home"] }, "/"), false);
+  assert.equal(canAccessPath({ ...limited, role: "ADMIN" }, emptyPermissions(limited.id), "/admin/employees"), false);
+});
+
+import { externalLinkError, linkTitleError } from "../lib/linkValidation.ts";
+test("page link URLs accept complete HTTP(S) addresses and reject credentials, malformed ports and executable schemes", () => {
+  for (const url of ["https://service.example.com:8443/dashboard?q=one#view", "http://localhost:3100/path", "http://192.168.1.5:8080/app", "http://[::1]:3000/", "https://example.com/a?q=%20"]) assert.equal(externalLinkError(url), undefined, url);
+  for (const url of ["", "  ", "javascript:alert(1)", "data:text/html,test", "//example.com", "ftp://example.com", "https://user:pass@example.com", "https://user@example.com", "https://@example.com", "https://example.com:99999", "https://example.com:0", "https://example.com:port", "https://", "https://exam ple.com", "https://example.com/\npath", "https://example.com\\evil"]) assert.ok(externalLinkError(url), url);
+});
+test("page link titles reject whitespace and same-panel duplicates after whitespace normalization", () => {
+  assert.ok(linkTitleError("  ", []));
+  assert.ok(linkTitleError(" سامانه   منابع انسانی ", ["سامانه منابع انسانی"]));
+  assert.ok(linkTitleError("crm", ["CRM"]));
+  assert.equal(linkTitleError(" سامانه جدید ", ["سامانه دیگر"]), undefined);
+});
+test("custom grants use stable IDs, deny inactive or missing entries and cannot unlock primary-admin settings", () => {
+  const custom = { id: "employee.custom.11111111-1111-4111-8111-111111111111" as const, panel: "employee" as const, label: "سامانه", active: true };
+  const permissions = { ...emptyPermissions(limited.id), employeeSections: [custom.id] };
+  assert.equal(canAccessSection(limited, permissions, custom.id), false);
+  assert.equal(canAccessSection(limited, emptyPermissions(limited.id), custom.id, [custom]), false);
+  assert.equal(canAccessSection(limited, permissions, custom.id, [custom]), true);
+  assert.equal(canAccessSection(limited, permissions, custom.id, [{ ...custom, label: "عنوان تازه" }]), true);
+  assert.equal(canAccessSection(limited, permissions, custom.id, [{ ...custom, active: false }]), false);
+  const adminCustom = { ...custom, id: "admin.custom.11111111-1111-4111-8111-111111111111" as const, panel: "admin" as const };
+  assert.equal(canAccessSection(limited, { ...permissions, adminSections: [adminCustom.id] }, adminCustom.id, [adminCustom]), false);
+  assert.equal(canAccessSection(limited, { ...permissions, adminAccess: true, adminSections: ["admin.links"] }, "admin.links"), false);
+});
