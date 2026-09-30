@@ -1,5 +1,14 @@
 # Validation evidence
 
+## Admin welcome-label removal: 2026-09-30
+
+Removed the «نسخه نمایشی» label and its dot from the `/admin` welcome banner. The icon and welcome copy retain their existing layout.
+
+- `npm.cmd run lint` and `npm.cmd run typecheck`: passed.
+- Existing browser inspection (`node scripts/qa-browser.cjs --inspect /admin 1440` and `390`, with `PORTAL_TEST_URL=http://localhost:3001`) ran against the existing development server in isolated Chrome contexts. Both snapshots and screenshots show the banner without the label; neither inspection reported overflow nodes, console/page errors, or axe violations.
+- Reports and visually reviewed screenshots: `test-results/admin-demo-label-desktop.{json,png}` and `test-results/admin-demo-label-mobile.{json,png}` (ignored local artifacts).
+- These were focused development-server checks; the full browser suite and production build were not rerun for this markup-only change.
+
 ## Delete every page/link entry: 2026-09-28
 
 Fresh checks for builtin and custom deletion in `/admin/links`:

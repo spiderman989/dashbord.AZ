@@ -78,6 +78,8 @@ Admin searches/sorts first name, last name, clearly visible organizational posit
 
 **Entry:** `/admin` → `AdminDashboard`; management links and sidebar → `ContentManager`. The overview reads six repositories (news, courses, gallery, announcements, processes, activities), waits for them, then shows five counts, recent news, process chart, activity list, and quick links. It does not count employee accounts or feedback.
 
+The admin dashboard welcome banner shows its icon and welcome copy without the «نسخه نمایشی» label (removed 2026-09-30).
+
 Content configurations define fields, defaults, parser, columns, filters, and optional toggle/reorder behavior. News/courses edit on routes; gallery/announcements/quick links edit in modals. Preview is built from configured values; delete uses ConfirmDialog. Content logging is separate from the primary write. Quick-link reorder replaces the full ordered collection and does not log an activity.
 
 **Change considerations:** shared generic changes affect five content resources. ProcessStatus reused on the admin overview links to employee `/processes` only when that employee-section grant is present; navigation still requires the separate employee session. Admin activity history is read-only; there is no general process administration screen.
